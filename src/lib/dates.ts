@@ -48,6 +48,16 @@ export function formatPublishedDate(date: Date): string {
   return `${date.getUTCFullYear()}年${date.getUTCMonth() + 1}月${date.getUTCDate()}日`;
 }
 
+/** Compact month-day for the log's entry rows, e.g. "05-27". */
+export function formatEntryDate(date: Date): string {
+  return toIsoDate(date).slice(5);
+}
+
+/** Short ISO-week label for an entry, e.g. "第 22 周". */
+export function formatWeekLabel(date: Date): string {
+  return `第 ${isoWeekParts(date).week} 周`;
+}
+
 /** ISO date string (YYYY-MM-DD) for <time datetime>. */
 export function toIsoDate(date: Date): string {
   return toUtcMidnight(date).toISOString().slice(0, 10);

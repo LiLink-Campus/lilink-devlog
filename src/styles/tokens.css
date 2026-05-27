@@ -46,4 +46,17 @@
 
   --container: 1120px;
   --container-prose: 680px;
+
+  /* Reading measure — comfortable Chinese line length (~32–36 chars). */
+  --measure: 36rem;
+
+  /* Spacing scale (4px base) for a consistent vertical rhythm. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
 }

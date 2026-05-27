@@ -1,103 +1,574 @@
 ---
-import PostCard from "../components/PostCard.astro";
+import { Image } from "astro:assets";
+import { render } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import {
+  formatEntryDate,
+  formatPublishedDate,
+  formatWeekLabel,
+  toIsoDate,
+} from "../lib/dates";
 import { getPublishedPosts, groupByWeek } from "../lib/posts";
 
 const posts = await getPublishedPosts();
 const weeks = groupByWeek(posts);
+
+// The home page is the open book: a contents rail on the left, one entry's
+// page on the right. Every body is rendered up front; CSS (:target) decides
+// which page shows. Standalone /posts/[slug] pages still exist for RSS,
+// sharing and SEO.
+type Body = Awaited<ReturnType<typeof render>>["Content"];
+const bodies = new Map<string, Body>();
+for (const post of posts) {
+  const { Content } = await render(post);
+  bodies.set(post.id, Content);
+}
+
+// With no hash, the newest entry is the page shown by default.
+const newestId = posts[0]?.id;
+const entryCount = posts.length;
+const weekCount = weeks.length;
 
 const description =
   "LiLink 开发日志：我们每周、甚至每天记录产品的迭代——遇到了什么问题，做了哪些改动，体验有了什么变化。";
 ---
 
 <BaseLayout title="LiLink devlog" description={description}>
-  <section class="hero container">
-    <p class="eyebrow">LiLink devlog</p>
-    <h1>我们在认真地，一点点把它做好</h1>
-    <p class="lede">{description}</p>
-  </section>
-
-  <section class="timeline container">
-    {
-      weeks.length === 0 ? (
-        <p class="empty">还没有更新，很快就来。</p>
-      ) : (
-        weeks.map((week) => (
-          <div class="week">
-            <div class="week-head">
-              <h2>
-                {week.isoYear} · 第 {week.week} 周
-              </h2>
-              <span class="range">{week.rangeLabel}</span>
-            </div>
-            <div class="entries">
-              {week.posts.map((post) => (
-                <PostCard post={post} />
+  {
+    weeks.length === 0 ? (
+      <p class="empty container">还没有更新，很快就来。</p>
+    ) : (
+      <div class="book container">
+        <nav class="toc" aria-label="目录">
+          <div class="toc-head">
+            <h1>LiLink 开发日志</h1>
+            <p class="toc-lede">持续记录每一次迭代</p>
+            <p class="toc-stat">
+              共 {entryCount} 篇 · 跨 {weekCount} 周
+            </p>
+          </div>
+          <details class="toc-nav" open>
+            <summary class="toc-toggle">
+              <span>目录</span>
+            </summary>
+            <div class="toc-weeks">
+              {weeks.map((week) => (
+                <div class="toc-week">
+                  <p class="toc-week-head">
+                    <span>
+                      {week.isoYear} · 第 {week.week} 周
+                    </span>
+                    <span class="range">{week.rangeLabel}</span>
+                  </p>
+                  <ul>
+                    {week.posts.map((post) => (
+                      <li>
+                        <a
+                          class:list={["toc-item", { featured: post.data.featured }]}
+                          href={`#${post.id}`}
+                        >
+                          <time datetime={toIsoDate(post.data.publishedAt)}>
+                            {formatEntryDate(post.data.publishedAt)}
+                          </time>
+                          <span class="t">{post.data.title}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
             </div>
-          </div>
-        ))
-      )
-    }
-  </section>
+          </details>
+        </nav>
+
+        <div class="reader">
+          {posts.map((post, i) => {
+            const Content = bodies.get(post.id)!;
+            const { title, summary, publishedAt, authors, cover } = post.data;
+            const newer = posts[i - 1]; // 时间上更新的一条（数组为最新在前）
+            const older = posts[i + 1]; // 时间上更早的一条
+            return (
+              <article
+                class="page"
+                id={post.id}
+                data-default={post.id === newestId ? "" : undefined}
+              >
+                <header class="page-head">
+                  <p class="page-meta">
+                    <time datetime={toIsoDate(publishedAt)}>
+                      {formatPublishedDate(publishedAt)}
+                    </time>
+                    <span class="dot" aria-hidden="true">·</span>
+                    <span class="week">{formatWeekLabel(publishedAt)}</span>
+                    <span class="dot" aria-hidden="true">·</span>
+                    <span class="by">{authors.join("、")}</span>
+                  </p>
+                  <h2>{title}</h2>
+                  <p class="page-summary">{summary}</p>
+                </header>
+                {cover ? (
+                  <Image
+                    class="page-cover"
+                    src={cover}
+                    alt={title}
+                    widths={[480, 960]}
+                  />
+                ) : null}
+                <div class="prose">
+                  <Content />
+                </div>
+                <footer class="page-foot">
+                  <div class="pager">
+                    {newer ? (
+                      <a class="pager-link prev" href={`#${newer.id}`}>
+                        <span class="pager-dir">← 更新的一条</span>
+                        <span class="pager-title">{newer.data.title}</span>
+                      </a>
+                    ) : (
+                      <span class="pager-link is-empty" aria-hidden="true" />
+                    )}
+                    {older ? (
+                      <a class="pager-link next" href={`#${older.id}`}>
+                        <span class="pager-dir">更早的一条 →</span>
+                        <span class="pager-title">{older.data.title}</span>
+                      </a>
+                    ) : (
+                      <span class="pager-link is-empty" aria-hidden="true" />
+                    )}
+                  </div>
+                  <a class="permalink" href={`/posts/${post.id}`}>
+                    永久链接 ↗
+                  </a>
+                </footer>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    )
+  }
 </BaseLayout>
 
+<script is:inline>
+  // Show/hide is pure CSS (:target). JS only enhances:
+  //   · highlight the active contents item and keep it scrolled into view
+  //   · arrow-key paging between adjacent entries
+  //   · collapse the contents on narrow screens (ships open, so it degrades)
+  (function () {
+    var pages = Array.prototype.slice.call(document.querySelectorAll(".page"));
+
+    function activePage() {
+      var id = decodeURIComponent(location.hash.slice(1));
+      var el = id && document.getElementById(id);
+      if (!el || el.className.indexOf("page") === -1) {
+        el = document.querySelector(".page[data-default]");
+      }
+      return el;
+    }
+
+    function syncActive() {
+      var active = activePage();
+      var href = active ? "#" + active.id : null;
+      document.querySelectorAll(".toc-item").forEach(function (a) {
+        var on = a.getAttribute("href") === href;
+        a.classList.toggle("is-active", on);
+        if (on) a.scrollIntoView({ block: "nearest" });
+      });
+    }
+
+    // ← / → jump to the newer / older entry (array is newest-first).
+    function onKey(e) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      var t = e.target;
+      if (
+        t &&
+        (t.isContentEditable ||
+          /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""))
+      )
+        return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      var i = pages.indexOf(activePage());
+      if (i === -1) return;
+      var to = e.key === "ArrowLeft" ? pages[i - 1] : pages[i + 1];
+      if (to) {
+        e.preventDefault();
+        location.hash = "#" + to.id;
+      }
+    }
+
+    // The <details> ships `open`; collapse it only on narrow screens.
+    var details = document.querySelector(".toc-nav");
+    var mql = window.matchMedia("(max-width: 820px)");
+    function syncCollapse(e) {
+      if (details) details.open = !e.matches;
+    }
+    if (details) {
+      syncCollapse(mql);
+      mql.addEventListener("change", syncCollapse);
+    }
+
+    addEventListener("hashchange", syncActive);
+    addEventListener("keydown", onKey);
+    syncActive();
+  })();
+</script>
+
 <style>
-  .hero {
-    padding-block: 3.5rem 2rem;
-    max-width: 46rem;
+  .empty {
+    padding-block: var(--space-8);
+    color: var(--color-text-muted);
   }
 
-  .hero h1 {
-    margin: 0.6rem 0 1rem;
-    font-size: clamp(2rem, 5vw, 2.8rem);
+  .book {
+    display: grid;
+    grid-template-columns: 16.5rem minmax(0, 1fr);
+    gap: var(--space-8);
+    align-items: start;
+    padding-block: var(--space-6) var(--space-8);
   }
 
-  .hero .lede {
-    margin: 0;
-    font-size: 1.05rem;
-    color: var(--color-text-secondary);
+  /* Left rail — the contents / spine of the book */
+  .toc {
+    position: sticky;
+    top: 4.75rem;
+    max-height: calc(100dvh - 5.75rem);
+    overflow: auto;
+    padding-right: var(--space-2);
   }
 
-  .timeline {
-    padding-bottom: 2rem;
-    display: flex;
-    flex-direction: column;
-    gap: 2.5rem;
-  }
-
-  .week-head {
-    display: flex;
-    align-items: baseline;
-    gap: 0.8rem;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
+  .toc-head {
+    margin-bottom: var(--space-5);
+    padding-bottom: var(--space-4);
     border-bottom: 1px solid var(--color-border);
   }
 
-  .week-head h2 {
+  .toc-head h1 {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: 1.25rem;
     color: var(--color-brand-ink);
   }
 
-  .week-head .range {
-    font-size: 0.85rem;
+  .toc-head .toc-lede {
+    margin: var(--space-1) 0 0;
+    font-size: 0.82rem;
     color: var(--color-text-muted);
   }
 
-  .entries {
+  .toc-stat {
+    margin: var(--space-3) 0 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .toc-nav {
+    margin: 0;
+  }
+
+  /* The toggle only appears on narrow screens (see media query). */
+  .toc-toggle {
+    display: none;
+  }
+
+  .toc-week + .toc-week {
+    margin-top: var(--space-5);
+  }
+
+  .toc-week-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-2);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
+
+  .toc-week-head .range {
+    font-weight: 400;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .toc ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .toc-item {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border-radius: var(--radius-xs);
+    border-left: 2px solid transparent;
+    transition:
+      background 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .toc-item time {
+    flex-shrink: 0;
+    font-size: 0.74rem;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .toc-item .t {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .toc-item:hover {
+    background: var(--color-surface-muted);
+  }
+
+  .toc-item:hover .t {
+    color: var(--color-brand);
+  }
+
+  .toc-item.featured .t::after {
+    content: "★";
+    margin-left: 0.3rem;
+    font-size: 0.7em;
+    vertical-align: 0.2em;
+    color: var(--color-gold);
+  }
+
+  .toc-item.is-active {
+    background: var(--color-brand-tint);
+    border-left-color: var(--color-brand);
+  }
+
+  .toc-item.is-active .t {
+    color: var(--color-brand-ink);
+    font-weight: 600;
+  }
+
+  .toc-item.is-active time {
+    color: var(--color-brand);
+  }
+
+  /* Right page — one entry at a time, chosen by the URL fragment */
+  .reader {
+    min-width: 0;
+  }
+
+  .page {
+    display: none;
+    max-width: var(--measure);
+    scroll-margin-top: 4.75rem;
+  }
+
+  .page:target {
+    display: block;
+  }
+
+  /* No (or unknown) hash → show the newest entry. */
+  .reader:not(:has(.page:target)) .page[data-default] {
+    display: block;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .page:target,
+    .reader:not(:has(.page:target)) .page[data-default] {
+      animation: turn 0.24s ease;
+    }
+  }
+
+  @keyframes turn {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .page-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page-meta .dot {
+    color: var(--color-border-strong);
+  }
+
+  .page-head h2 {
+    margin: var(--space-3) 0 var(--space-4);
+    font-size: clamp(1.75rem, 3.5vw, 2.25rem);
+    text-wrap: balance;
+  }
+
+  .page-head .page-summary {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    text-wrap: pretty;
+  }
+
+  .page-cover {
+    width: 100%;
+    height: auto;
+    margin-top: var(--space-6);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+  }
+
+  .prose {
+    margin-top: var(--space-6);
+  }
+
+  /* Foot — prev/next pager + permalink */
+  .page-foot {
+    margin-top: var(--space-7);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .pager {
     display: grid;
-    gap: 1rem;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
   }
 
-  .empty {
+  .pager-link {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease;
+  }
+
+  a.pager-link:hover {
+    border-color: var(--color-brand);
+    background: var(--color-surface-tinted);
+  }
+
+  .pager-link.next {
+    text-align: right;
+  }
+
+  .pager-link.is-empty {
+    border: none;
+    background: none;
+  }
+
+  .pager-dir {
+    font-size: 0.76rem;
     color: var(--color-text-muted);
   }
 
-  @media (min-width: 720px) {
-    .entries {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+  a.pager-link:hover .pager-dir {
+    color: var(--color-brand);
+  }
+
+  .pager-title {
+    font-size: 0.9rem;
+    line-height: 1.35;
+    color: var(--color-text-secondary);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
+  }
+
+  .page-foot .permalink {
+    display: inline-block;
+    margin-top: var(--space-4);
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    transition: color 0.15s ease;
+  }
+
+  .page-foot .permalink:hover {
+    color: var(--color-brand);
+  }
+
+  /* Narrow screens: the contents collapse above the page */
+  @media (max-width: 820px) {
+    .book {
+      grid-template-columns: 1fr;
+      gap: var(--space-5);
+    }
+
+    .toc {
+      position: static;
+      max-height: none;
+      overflow: visible;
+      padding-right: 0;
+    }
+
+    .toc-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-top: var(--space-4);
+      padding: var(--space-2) var(--space-4);
+      border: 1px solid var(--color-border-strong);
+      border-radius: var(--radius-pill);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      list-style: none;
+      width: max-content;
+    }
+
+    .toc-toggle::-webkit-details-marker {
+      display: none;
+    }
+
+    .toc-toggle::after {
+      content: "▾";
+      font-size: 0.8em;
+      transition: transform 0.15s ease;
+    }
+
+    .toc-nav[open] .toc-toggle::after {
+      transform: rotate(180deg);
+    }
+
+    .toc-weeks {
+      margin-top: var(--space-4);
+    }
+
+    .page {
+      max-width: none;
+    }
+
+    .pager {
+      grid-template-columns: 1fr;
+    }
+
+    .pager-link.is-empty {
+      display: none;
     }
   }
 </style>
