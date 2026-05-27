@@ -1,0 +1,62 @@
+---
+import BrandMark from "./BrandMark.astro";
+
+const mainSite = "https://www.lilink.top";
+---
+
+<header class="site-header">
+  <div class="container inner">
+    <BrandMark href="/" />
+    <nav class="nav" aria-label="主导航">
+      <a href="/rss.xml">RSS</a>
+      <a class="back" href={mainSite}>回到 LiLink</a>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    border-bottom: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-canvas) 88%, white);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 0.9rem;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    font-size: 0.92rem;
+  }
+
+  .nav a {
+    color: var(--color-text-secondary);
+    transition: color 0.15s ease;
+  }
+
+  .nav a:hover {
+    color: var(--color-brand);
+  }
+
+  .nav .back {
+    padding: 0.4rem 0.85rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-text);
+  }
+
+  .nav .back:hover {
+    border-color: var(--color-brand);
+    color: var(--color-brand);
+  }
+</style>

@@ -1,0 +1,103 @@
+---
+import PostCard from "../components/PostCard.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getPublishedPosts, groupByWeek } from "../lib/posts";
+
+const posts = await getPublishedPosts();
+const weeks = groupByWeek(posts);
+
+const description =
+  "LiLink 开发日志：我们每周、甚至每天记录产品的迭代——遇到了什么问题，做了哪些改动，体验有了什么变化。";
+---
+
+<BaseLayout title="LiLink devlog" description={description}>
+  <section class="hero container">
+    <p class="eyebrow">LiLink devlog</p>
+    <h1>我们在认真地，一点点把它做好</h1>
+    <p class="lede">{description}</p>
+  </section>
+
+  <section class="timeline container">
+    {
+      weeks.length === 0 ? (
+        <p class="empty">还没有更新，很快就来。</p>
+      ) : (
+        weeks.map((week) => (
+          <div class="week">
+            <div class="week-head">
+              <h2>
+                {week.isoYear} · 第 {week.week} 周
+              </h2>
+              <span class="range">{week.rangeLabel}</span>
+            </div>
+            <div class="entries">
+              {week.posts.map((post) => (
+                <PostCard post={post} />
+              ))}
+            </div>
+          </div>
+        ))
+      )
+    }
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    padding-block: 3.5rem 2rem;
+    max-width: 46rem;
+  }
+
+  .hero h1 {
+    margin: 0.6rem 0 1rem;
+    font-size: clamp(2rem, 5vw, 2.8rem);
+  }
+
+  .hero .lede {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--color-text-secondary);
+  }
+
+  .timeline {
+    padding-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  .week-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .week-head h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--color-brand-ink);
+  }
+
+  .week-head .range {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+  }
+
+  .entries {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .empty {
+    color: var(--color-text-muted);
+  }
+
+  @media (min-width: 720px) {
+    .entries {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>

@@ -1,0 +1,71 @@
+---
+const mainSite = "https://www.lilink.top";
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="container inner">
+    <p class="brand">
+      LiLink
+      <small>校园里的，认真相遇</small>
+    </p>
+    <nav class="links" aria-label="页脚导航">
+      <a href={mainSite}>主站</a>
+      <a href={`${mainSite}/about`}>关于</a>
+      <a href={`${mainSite}/schools`}>支持的学校</a>
+      <a href="/rss.xml">RSS</a>
+    </nav>
+    <p class="copyright">© {year} LiLink</p>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    flex-shrink: 0;
+    margin-top: 4rem;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface-tinted);
+  }
+
+  .inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 2rem;
+  }
+
+  .brand {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--color-brand);
+  }
+
+  .brand small {
+    display: block;
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    margin-top: 0.2rem;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+  }
+
+  .links a:hover {
+    color: var(--color-brand);
+  }
+
+  .copyright {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+  }
+</style>

@@ -1,0 +1,85 @@
+---
+interface Props {
+  href?: string;
+  showTagline?: boolean;
+}
+
+const { href = "/", showTagline = true } = Astro.props;
+---
+
+<a class="brand-mark" href={href} aria-label="LiLink devlog 首页">
+  <span class="glyph" aria-hidden="true">
+    <span class="glyph-text">Li</span>
+    <span class="glyph-sparkle"></span>
+  </span>
+  <span class="text">
+    <strong>LiLink <span class="text-accent">devlog</span></strong>
+    {showTagline ? <small>持续迭代，认真相遇</small> : null}
+  </span>
+</a>
+
+<style>
+  .brand-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    color: var(--color-text);
+  }
+
+  .glyph {
+    width: 2.4rem;
+    height: 2.4rem;
+    flex-shrink: 0;
+    position: relative;
+    display: grid;
+    place-items: center;
+    border-radius: 0.7rem;
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-brand) 100%);
+    color: var(--color-text-on-brand);
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow:
+      0 6px 18px rgba(139, 58, 74, 0.26),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  .glyph-text {
+    font-size: 1rem;
+    line-height: 1;
+    margin-top: 1px;
+  }
+
+  .glyph-sparkle {
+    position: absolute;
+    top: 0.32rem;
+    right: 0.32rem;
+    width: 0.35rem;
+    height: 0.35rem;
+    border-radius: 50%;
+    background: rgba(255, 247, 238, 0.75);
+    box-shadow: 0 0 6px rgba(255, 247, 238, 0.6);
+  }
+
+  .text strong {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    letter-spacing: 0.005em;
+    line-height: 1.1;
+    font-weight: 600;
+  }
+
+  .text-accent {
+    color: var(--color-brand);
+    font-style: italic;
+  }
+
+  .text small {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    letter-spacing: 0.04em;
+    margin-top: 0.15rem;
+  }
+</style>
