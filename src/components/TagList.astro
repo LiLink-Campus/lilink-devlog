@@ -1,0 +1,60 @@
+---
+import type { Tag } from "../lib/tags";
+
+interface Props {
+  tags: Tag[];
+  size?: "sm" | "md";
+}
+
+const { tags, size = "md" } = Astro.props;
+---
+
+{
+  tags.length > 0 && (
+    <ul class:list={["tag-list", size]} aria-label="标签">
+      {tags.map((tag) => (
+        <li>
+          <a class="chip" href={`/tags/${tag.id}`}>
+            {tag.label}
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+<style>
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chip {
+    display: inline-block;
+    padding: 0.25rem 0.7rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+    transition:
+      background 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .tag-list.sm .chip {
+    padding: 0.15rem 0.55rem;
+    font-size: 0.74rem;
+  }
+
+  .chip:hover {
+    background: var(--color-brand-tint);
+    color: var(--color-brand-ink);
+    border-color: var(--color-brand);
+  }
+</style>

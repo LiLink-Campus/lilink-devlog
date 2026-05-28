@@ -1,0 +1,110 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getAllTagsWithCounts } from "../../lib/posts";
+
+const tagsWithCounts = await getAllTagsWithCounts();
+
+const description = "按标签浏览 LiLink 开发日志的全部更新。";
+---
+
+<BaseLayout title="标签" description={description}>
+  <div class="tags-index container">
+    <header class="tags-head">
+      <h1>按标签浏览</h1>
+      <p class="lede">沿着某条线索，看产品如何一点点长成现在的样子。</p>
+    </header>
+    {
+      tagsWithCounts.length === 0 ? (
+        <p class="empty">还没有标签。</p>
+      ) : (
+        <ul class="tag-grid">
+          {tagsWithCounts.map(({ tag, count }) => (
+            <li>
+              <a class="tag-card" href={`/tags/${tag.id}`}>
+                <span class="tag-label">{tag.label}</span>
+                {tag.description && (
+                  <span class="tag-desc">{tag.description}</span>
+                )}
+                <span class="tag-count">{count} 篇</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .tags-index {
+    padding-block: var(--space-7) var(--space-8);
+  }
+
+  .tags-head {
+    margin-bottom: var(--space-6);
+  }
+
+  .tags-head h1 {
+    margin: 0;
+    font-size: clamp(1.6rem, 3vw, 2rem);
+    color: var(--color-brand-ink);
+  }
+
+  .tags-head .lede {
+    margin: var(--space-2) 0 0;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    color: var(--color-text-secondary);
+  }
+
+  .empty {
+    color: var(--color-text-muted);
+  }
+
+  .tag-grid {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: var(--space-4);
+  }
+
+  .tag-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    height: 100%;
+    padding: var(--space-5);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-tinted);
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .tag-card:hover {
+    border-color: var(--color-brand);
+    box-shadow: var(--shadow-md);
+  }
+
+  .tag-label {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    color: var(--color-brand-ink);
+  }
+
+  .tag-desc {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+  }
+
+  .tag-count {
+    margin-top: auto;
+    font-size: 0.78rem;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

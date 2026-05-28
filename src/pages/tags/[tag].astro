@@ -1,0 +1,163 @@
+---
+import type { GetStaticPaths } from "astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { formatPublishedDate, toIsoDate } from "../../lib/dates";
+import { getAllTagsWithCounts, getPostsByTag } from "../../lib/posts";
+import type { Tag } from "../../lib/tags";
+
+export const getStaticPaths = (async () => {
+  const tagsWithCounts = await getAllTagsWithCounts();
+  return Promise.all(
+    tagsWithCounts.map(async ({ tag }) => ({
+      params: { tag: tag.id },
+      props: { tag, posts: await getPostsByTag(tag.id) },
+    })),
+  );
+}) satisfies GetStaticPaths;
+
+interface Props {
+  tag: Tag;
+  posts: Awaited<ReturnType<typeof getPostsByTag>>;
+}
+
+const { tag, posts } = Astro.props;
+
+const description = tag.description ?? `带有「${tag.label}」标签的全部更新。`;
+---
+
+<BaseLayout title={tag.label} description={description}>
+  <div class="tag-archive container">
+    <a class="back" href="/tags">← 全部标签</a>
+    <header class="tag-head">
+      <h1>{tag.label}</h1>
+      {tag.description ? <p class="lede">{tag.description}</p> : null}
+      <p class="count">{posts.length} 篇</p>
+    </header>
+    {
+      posts.length === 0 ? (
+        <p class="empty">这个标签下还没有更新。</p>
+      ) : (
+        <ul class="post-list">
+          {posts.map((post) => (
+            <li class="post-row">
+              <a class="post-link" href={`/posts/${post.id}`}>
+                <time datetime={toIsoDate(post.data.publishedAt)}>
+                  {formatPublishedDate(post.data.publishedAt)}
+                </time>
+                <span class="post-title">{post.data.title}</span>
+                <span class="post-summary">{post.data.summary}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .tag-archive {
+    padding-block: var(--space-6) var(--space-8);
+  }
+
+  .back {
+    display: inline-block;
+    margin-bottom: var(--space-5);
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    transition: color 0.15s ease;
+  }
+
+  .back:hover {
+    color: var(--color-brand);
+  }
+
+  .tag-head {
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .tag-head h1 {
+    margin: 0;
+    font-size: clamp(1.6rem, 3vw, 2rem);
+    color: var(--color-brand-ink);
+  }
+
+  .tag-head .lede {
+    margin: var(--space-2) 0 0;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    color: var(--color-text-secondary);
+  }
+
+  .tag-head .count {
+    margin: var(--space-3) 0 0;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .empty {
+    color: var(--color-text-muted);
+  }
+
+  .post-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .post-row + .post-row {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .post-link {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: var(--space-1) var(--space-4);
+    padding: var(--space-4) var(--space-2);
+    border-radius: var(--radius-xs);
+    transition: background 0.15s ease;
+  }
+
+  .post-link:hover {
+    background: var(--color-surface-tinted);
+  }
+
+  .post-link time {
+    grid-row: 1 / 3;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .post-title {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--color-text);
+    transition: color 0.15s ease;
+  }
+
+  .post-link:hover .post-title {
+    color: var(--color-brand);
+  }
+
+  .post-summary {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--color-text-secondary);
+  }
+
+  @media (max-width: 560px) {
+    .post-link {
+      grid-template-columns: 1fr;
+    }
+
+    .post-link time {
+      grid-row: auto;
+    }
+  }
+</style>

@@ -1,8 +1,11 @@
 ---
 import { Image } from "astro:assets";
+import AuthorCard from "../components/AuthorCard.astro";
+import TagList from "../components/TagList.astro";
 import { resolveAuthors } from "../lib/authors";
 import { formatPublishedDate, formatWeekLabel, toIsoDate } from "../lib/dates";
 import type { Post } from "../lib/posts";
+import { resolveTags } from "../lib/tags";
 import BaseLayout from "./BaseLayout.astro";
 
 interface Props {
@@ -10,8 +13,12 @@ interface Props {
 }
 
 const { post } = Astro.props;
-const { title, summary, publishedAt, authors, cover } = post.data;
-const authorNames = resolveAuthors(authors).map((a) => a.name);
+const { title, summary, publishedAt, updatedAt, authors, tags, cover } = post.data;
+const resolvedAuthors = resolveAuthors(authors);
+const authorNames = resolvedAuthors.map((a) => a.name);
+const resolvedTags = resolveTags(tags);
+
+const hasUpdate = updatedAt && updatedAt.getTime() !== publishedAt.getTime();
 
 const ogImage = `/og/${post.id}.png`;
 const url = new URL(`/posts/${post.id}`, Astro.site).href;
@@ -21,8 +28,10 @@ const jsonLd = {
   headline: title,
   description: summary,
   datePublished: toIsoDate(publishedAt),
+  ...(hasUpdate ? { dateModified: toIsoDate(updatedAt) } : {}),
   inLanguage: "zh-CN",
   author: authorNames.map((name) => ({ "@type": "Organization", name })),
+  keywords: resolvedTags.map((t) => t.label).join(", "),
   image: new URL(ogImage, Astro.site).href,
   url,
   mainEntityOfPage: url,
@@ -54,14 +63,22 @@ const jsonLd = {
         <span class="week">{formatWeekLabel(publishedAt)}</span>
         <span class="dot" aria-hidden="true">·</span>
         <span class="by">{authorNames.join("、")}</span>
+        {hasUpdate ? (
+          <>
+            <span class="dot" aria-hidden="true">·</span>
+            <span class="updated">更新于 {formatPublishedDate(updatedAt)}</span>
+          </>
+        ) : null}
       </p>
       <h1>{title}</h1>
       <p class="summary">{summary}</p>
+      <TagList tags={resolvedTags} />
     </header>
     {cover ? <Image class="cover" src={cover} alt={title} widths={[480, 960]} /> : null}
     <div class="prose">
       <slot />
     </div>
+    <AuthorCard authors={resolvedAuthors} />
   </article>
 </BaseLayout>
 
@@ -114,6 +131,10 @@ const jsonLd = {
     line-height: 1.6;
     color: var(--color-text-secondary);
     text-wrap: pretty;
+  }
+
+  .post-header :global(.tag-list) {
+    margin-top: var(--space-4);
   }
 
   .cover {
