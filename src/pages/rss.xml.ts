@@ -10,6 +10,9 @@ export async function GET(context: APIContext) {
     title: "LiLink devlog",
     description: "LiLink 产品迭代日志：我们解决了哪些问题，体验有了什么变化。",
     site,
+    // @astrojs/rss adds a trailing slash by default; keep links bare to match
+    // the canonical and sitemap URLs (both slash-less under trailingSlash: never).
+    trailingSlash: false,
     items: posts.map((post) => ({
       title: post.data.title,
       description: post.data.summary,
