@@ -30,6 +30,34 @@ cp src/content/posts/_template.mdx src/content/posts/YYYY-MM-DD-slug.mdx
 
 填写 frontmatter（标题、日期、摘要等，schema 见 `src/content.config.ts`）后写正文即可。
 
+## 发布流程（draft → review → published）
+
+文章采用基于 PR 的发布流程，由 frontmatter 中的 `status` 字段控制生命周期：
+
+- `draft`：草稿，正在撰写。
+- `review`：评审中，等待合并。
+- `published`：已发布（`status` 缺省即视为 `published`）。
+
+`draft` 与 `review` 的文章在 `astro dev` 下可见，便于本地预览；但生产构建会通过 `src/lib/posts.ts` 的 `getPublishedPosts()` 自动排除它们，因此未发布内容不会出现在线上。
+
+每个 PR 都会在 CI（`.github/workflows/ci.yml`）中运行 `npm run ci`（等价于 `validate` + `check` + `build`），三者全部通过才能合并：
+
+```sh
+npm run validate   # 校验全部文章
+npm run ci         # = validate && check && build（CI 同款）
+```
+
+`npm run validate`（`scripts/validate-content.mjs`）会扫描 `src/content/posts/*.mdx`（跳过 `_*.mdx`）并校验：
+
+- frontmatter 完整、格式正确：必填 `title`/`publishedAt`/`summary`，日期为合法 ISO，`status` 取值合法，`featured` 为布尔，`tags` ≤ 4。
+- `authors` 中每个 ID 都在作者注册表 `src/lib/authors.ts` 内。
+- `tags` 中每个 ID 都在标签注册表 `src/lib/tags.ts` 内，且数量 ≤ 4。
+- 媒体路径可解析：`cover`、正文中的 `import` 图片、`/media/...` 自托管视频、Markdown 图片均需存在，且 Markdown 图片必须带非空 `alt`。
+- 内部链接有效：`/posts/<slug>` 指向存在的文章、`/tags/<id>` 指向已知标签。
+- 草稿暴露守卫：`published` 文章不得链接到 `draft`/`review` 文章。
+
+因此撰写时需遵循作者/标签注册表与富媒体规则（图片需 `alt`、外部嵌入需 `title`、自托管视频放在 `public/media/` 下）。
+
 ## Open Graph 图片
 
 ```sh

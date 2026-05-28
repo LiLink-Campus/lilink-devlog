@@ -11,6 +11,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
+    "validate": "node scripts/validate-content.mjs",
+    "ci": "npm run validate && npm run check && npm run build",
     "og:image": "node scripts/generate-og.mjs"
   },
   "dependencies": {
