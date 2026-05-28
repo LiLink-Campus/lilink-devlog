@@ -31,9 +31,26 @@ const weekCount = weeks.length;
 
 const description =
   "LiLink 开发日志：我们每周、甚至每天记录产品的迭代——遇到了什么问题，做了哪些改动，体验有了什么变化。";
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Blog",
+  name: "LiLink 开发日志",
+  description,
+  url: new URL("/", Astro.site).href,
+  inLanguage: "zh-CN",
+  publisher: {
+    "@type": "Organization",
+    name: "LiLink",
+    logo: {
+      "@type": "ImageObject",
+      url: new URL("/og-default.png", Astro.site).href,
+    },
+  },
+};
 ---
 
-<BaseLayout title="LiLink devlog" description={description}>
+<BaseLayout title="LiLink devlog" description={description} jsonLd={jsonLd}>
   {
     weeks.length === 0 ? (
       <p class="empty container">还没有更新，很快就来。</p>

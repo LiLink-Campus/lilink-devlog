@@ -10,6 +10,29 @@ interface Props {
 
 const { post } = Astro.props;
 const { title, summary, publishedAt, authors, cover } = post.data;
+
+const ogImage = `/og/${post.id}.png`;
+const url = new URL(`/posts/${post.id}`, Astro.site).href;
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: title,
+  description: summary,
+  datePublished: toIsoDate(publishedAt),
+  inLanguage: "zh-CN",
+  author: authors.map((name) => ({ "@type": "Organization", name })),
+  image: new URL(ogImage, Astro.site).href,
+  url,
+  mainEntityOfPage: url,
+  publisher: {
+    "@type": "Organization",
+    name: "LiLink",
+    logo: {
+      "@type": "ImageObject",
+      url: new URL("/og-default.png", Astro.site).href,
+    },
+  },
+};
 ---
 
 <BaseLayout
@@ -17,6 +40,8 @@ const { title, summary, publishedAt, authors, cover } = post.data;
   description={summary}
   ogType="article"
   publishedTime={toIsoDate(publishedAt)}
+  ogImage={ogImage}
+  jsonLd={jsonLd}
 >
   <article class="post">
     <a class="back" href="/">← 全部更新</a>

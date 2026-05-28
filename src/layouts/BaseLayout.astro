@@ -1,4 +1,5 @@
 ---
+import Analytics from "@vercel/analytics/astro";
 import Footer from "../components/Footer.astro";
 import Header from "../components/Header.astro";
 import "../styles/global.css";
@@ -8,14 +9,25 @@ interface Props {
   description: string;
   ogType?: "website" | "article";
   publishedTime?: string;
+  /** Share-image path relative to the site root; defaults to the site card. */
+  ogImage?: string;
+  /** Optional schema.org structured data, injected as ld+json in <head>. */
+  jsonLd?: Record<string, unknown>;
 }
 
-const { title, description, ogType = "website", publishedTime } = Astro.props;
+const {
+  title,
+  description,
+  ogType = "website",
+  publishedTime,
+  ogImage = "/og-default.png",
+  jsonLd,
+} = Astro.props;
 
 const siteName = "LiLink devlog";
 const fullTitle = title === siteName ? title : `${title} · ${siteName}`;
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
-const ogImage = new URL("/og-default.png", Astro.site).href;
+const ogImageUrl = new URL(ogImage, Astro.site).href;
 ---
 
 <!doctype html>
@@ -35,7 +47,7 @@ const ogImage = new URL("/og-default.png", Astro.site).href;
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    <meta property="og:image" content={ogImage} />
+    <meta property="og:image" content={ogImageUrl} />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -44,7 +56,13 @@ const ogImage = new URL("/og-default.png", Astro.site).href;
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image" content={ogImageUrl} />
+
+    {
+      jsonLd ? (
+        <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonLd)} />
+      ) : null
+    }
   </head>
   <body>
     <Header />
@@ -52,5 +70,6 @@ const ogImage = new URL("/og-default.png", Astro.site).href;
       <slot />
     </main>
     <Footer />
+    <Analytics />
   </body>
 </html>

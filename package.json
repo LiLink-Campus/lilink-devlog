@@ -17,6 +17,7 @@
     "@astrojs/mdx": "^5.0.6",
     "@astrojs/rss": "^4.0.18",
     "@astrojs/sitemap": "^3.7.3",
+    "@vercel/analytics": "^2.0.1",
     "astro": "^6.3.8",
     "zod": "^4.3.6"
   },
