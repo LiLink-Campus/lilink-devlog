@@ -1,5 +1,6 @@
 ---
 import { Image } from "astro:assets";
+import { resolveAuthors } from "../lib/authors";
 import { formatPublishedDate, formatWeekLabel, toIsoDate } from "../lib/dates";
 import type { Post } from "../lib/posts";
 import BaseLayout from "./BaseLayout.astro";
@@ -10,6 +11,7 @@ interface Props {
 
 const { post } = Astro.props;
 const { title, summary, publishedAt, authors, cover } = post.data;
+const authorNames = resolveAuthors(authors).map((a) => a.name);
 
 const ogImage = `/og/${post.id}.png`;
 const url = new URL(`/posts/${post.id}`, Astro.site).href;
@@ -20,7 +22,7 @@ const jsonLd = {
   description: summary,
   datePublished: toIsoDate(publishedAt),
   inLanguage: "zh-CN",
-  author: authors.map((name) => ({ "@type": "Organization", name })),
+  author: authorNames.map((name) => ({ "@type": "Organization", name })),
   image: new URL(ogImage, Astro.site).href,
   url,
   mainEntityOfPage: url,
@@ -51,7 +53,7 @@ const jsonLd = {
         <span class="dot" aria-hidden="true">·</span>
         <span class="week">{formatWeekLabel(publishedAt)}</span>
         <span class="dot" aria-hidden="true">·</span>
-        <span class="by">{authors.join("、")}</span>
+        <span class="by">{authorNames.join("、")}</span>
       </p>
       <h1>{title}</h1>
       <p class="summary">{summary}</p>

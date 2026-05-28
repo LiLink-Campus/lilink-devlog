@@ -4,10 +4,15 @@
 title: "一句话标题：这次解决了什么"
 publishedAt: 2026-01-01
 summary: "用一句人话讲清楚：这期我们解决了什么问题、用户能感受到什么变化。"
-authors: ["LiLink 团队"]
-# featured: true   # 偶发的里程碑更新可开启，在时间线上轻微强调
-# draft: true       # 草稿：本地 dev 可见，正式构建不发布
-# cover: "./assets/封面.png"   # 可选封面，放在同目录的 assets/ 下
+# 作者用 ID 引用，ID 来自受控注册表 src/lib/authors.ts
+authors: ["lilink-team"]
+# 标签用 ID，取值见受控注册表 src/lib/tags.ts，最多 4 个；留空也可以
+tags: []
+# updatedAt: 2026-01-02         # 可选：内容更新日期，与发布日期并列展示
+# status: draft                 # 状态流转 draft → review → published；
+#                               # draft/review 仅本地 astro dev 可见，正式构建不发布
+# featured: true                # 偶发的里程碑更新可开启，在时间线上轻微强调
+# cover: "./assets/封面.png"    # 可选封面，放在同目录的 assets/ 下
 ---
 
 写给用户看，不写技术黑话。推荐三段式：

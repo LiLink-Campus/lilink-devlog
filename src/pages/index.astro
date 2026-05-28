@@ -8,6 +8,7 @@ import {
   formatWeekLabel,
   toIsoDate,
 } from "../lib/dates";
+import { resolveAuthors } from "../lib/authors";
 import { getPublishedPosts, groupByWeek } from "../lib/posts";
 
 const posts = await getPublishedPosts();
@@ -118,7 +119,11 @@ const jsonLd = {
                     <span class="dot" aria-hidden="true">·</span>
                     <span class="week">{formatWeekLabel(publishedAt)}</span>
                     <span class="dot" aria-hidden="true">·</span>
-                    <span class="by">{authors.join("、")}</span>
+                    <span class="by">
+                      {resolveAuthors(authors)
+                        .map((a) => a.name)
+                        .join("、")}
+                    </span>
                   </p>
                   <h2>{title}</h2>
                   <p class="page-summary">{summary}</p>
