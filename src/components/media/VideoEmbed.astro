@@ -1,0 +1,105 @@
+---
+import { isBlank, providerEmbedUrl, type VideoProvider } from "./validate";
+
+interface Props {
+  /**
+   * REQUIRED accessible title for the embed (used as the <iframe> title or the
+   * <video> aria-label). Empty/whitespace fails the build.
+   */
+  title: string;
+  /**
+   * Self-hosted mode: absolute path to a file under `/public`,
+   * e.g. `/media/clip.mp4`. Mutually exclusive with `provider`+`id`.
+   */
+  src?: string;
+  /** Optional poster image path for the self-hosted <video>. */
+  poster?: string;
+  /** External provider embed. Mutually exclusive with `src`. */
+  provider?: VideoProvider;
+  /** Provider video id (YouTube id or Bilibili bvid). Required with provider. */
+  id?: string;
+}
+
+const { title, src, poster, provider, id } = Astro.props;
+
+// Build-time enforcement: accessible title is required.
+if (isBlank(title)) {
+  throw new Error(
+    "VideoEmbed: title is required for accessibility. 视频嵌入必须提供非空 title。",
+  );
+}
+
+const hasLocal = !isBlank(src);
+const hasProvider = provider != null || !isBlank(id);
+
+// Exactly one of (src) or (provider + id) must be provided.
+if (hasLocal && hasProvider) {
+  throw new Error(
+    "VideoEmbed: provide either `src` (self-hosted) OR `provider`+`id` (external embed), not both.",
+  );
+}
+if (!hasLocal && !hasProvider) {
+  throw new Error(
+    "VideoEmbed: provide either `src` (self-hosted) OR `provider`+`id` (external embed).",
+  );
+}
+if (hasProvider && (provider == null || isBlank(id))) {
+  throw new Error(
+    "VideoEmbed: external embeds require both `provider` and a non-empty `id`.",
+  );
+}
+
+const embedUrl = hasProvider ? providerEmbedUrl(provider!, id!) : null;
+---
+
+<figure class="video-embed">
+  {
+    hasLocal ? (
+      <video
+        controls
+        preload="metadata"
+        poster={poster}
+        aria-label={title}
+        playsinline
+      >
+        <source src={src} />
+        你的浏览器不支持播放该视频。
+      </video>
+    ) : (
+      <iframe
+        src={embedUrl}
+        title={title}
+        loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen
+      />
+    )
+  }
+</figure>
+
+<style>
+  .video-embed {
+    position: relative;
+    margin: var(--space-6) 0;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    background: var(--color-surface-muted);
+  }
+
+  .video-embed :global(video),
+  .video-embed :global(iframe) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    margin: 0;
+  }
+
+  .video-embed :global(video) {
+    object-fit: contain;
+    background: #000;
+  }
+</style>

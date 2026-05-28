@@ -1,0 +1,48 @@
+---
+import { Image } from "astro:assets";
+import { assertAlt } from "./validate";
+
+interface Props {
+  /** An imported local image, e.g. `import img from "./assets/x.png"`. */
+  src: ImageMetadata;
+  /** REQUIRED alt text. Empty/whitespace fails the build. */
+  alt: string;
+  /** Optional caption shown beneath the image. */
+  caption?: string;
+  /** Responsive widths for the optimized <Image>. */
+  widths?: number[];
+}
+
+const { src, alt, caption, widths = [480, 960] } = Astro.props;
+
+// Build-time enforcement: missing alt text fails the build.
+assertAlt("Figure", alt, src.src);
+---
+
+<figure class="figure">
+  <Image src={src} alt={alt} widths={widths} sizes="(min-width: 720px) 680px, 100vw" />
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  .figure {
+    margin: var(--space-6) 0;
+  }
+
+  .figure :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    margin: 0;
+  }
+
+  .figure figcaption {
+    margin-top: var(--space-2);
+    text-align: center;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+  }
+</style>

@@ -1,0 +1,88 @@
+---
+import { Image } from "astro:assets";
+import { assertAlt } from "./validate";
+
+interface GalleryImage {
+  /** An imported local image, e.g. `import img from "./assets/x.png"`. */
+  src: ImageMetadata;
+  /** REQUIRED alt text per item. Empty/whitespace fails the build. */
+  alt: string;
+  /** Optional per-image caption. */
+  caption?: string;
+}
+
+interface Props {
+  images: GalleryImage[];
+  /** Number of columns on wide viewports. */
+  columns?: number;
+}
+
+const { images, columns = 2 } = Astro.props;
+
+// Build-time enforcement: every gallery item needs non-empty alt text.
+for (const image of images) {
+  assertAlt("Gallery", image.alt, image.src.src);
+}
+---
+
+<figure class="gallery" role="group" style={`--gallery-columns: ${columns}`}>
+  <ul class="gallery-grid">
+    {
+      images.map((image) => (
+        <li class="gallery-item">
+          <Image
+            src={image.src}
+            alt={image.alt}
+            widths={[400, 800]}
+            sizes="(min-width: 560px) 340px, 100vw"
+          />
+          {image.caption && <span class="gallery-caption">{image.caption}</span>}
+        </li>
+      ))
+    }
+  </ul>
+</figure>
+
+<style>
+  .gallery {
+    margin: var(--space-6) 0;
+  }
+
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--gallery-columns, 2), minmax(0, 1fr));
+    gap: var(--space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .gallery-item {
+    margin: 0;
+  }
+
+  .gallery-item :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    margin: 0;
+  }
+
+  .gallery-caption {
+    display: block;
+    margin-top: var(--space-2);
+    text-align: center;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+  }
+
+  /* Collapse to a single column on narrow viewports. */
+  @media (max-width: 560px) {
+    .gallery-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

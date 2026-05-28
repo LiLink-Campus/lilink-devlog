@@ -28,3 +28,45 @@ tags: []
 ## 现在的体验
 
 改完之后用户会感受到什么。可以配 before / after 截图。
+
+{/*
+## 富媒体（可选）
+
+本站支持图文、图集与视频嵌入，所有素材都会在构建时校验，缺图 / 缺 alt / 缺 title
+会让构建失败，详见下面的约定。
+
+约定（Phase 4 的校验脚本也按此检查）：
+- 本地正文图片：放在同目录的 `./assets/` 下，用 ESM 导入后传给组件；
+  每张图都必须有非空 `alt`。
+- 自托管视频：文件放在 `public/media/` 下，用绝对路径 `/media/...` 引用。
+- 外部嵌入：仅支持 `youtube` / `bilibili`，且必须提供非空 `title`。
+
+用法示例（取消注释并替换为真实素材即可）：
+
+import { Figure, Gallery, VideoEmbed } from "../../components/media";
+import shot from "./assets/截图.png";
+import before from "./assets/改造前.png";
+import after from "./assets/改造后.png";
+
+单张图（alt 必填，caption 可选）：
+
+<Figure src={shot} alt="新版首页的主操作区" caption="图：重新组织后的首页" />
+
+图集 / before-after（每张图的 alt 都必填，columns 默认 2）：
+
+<Gallery
+  images={[
+    { src: before, alt: "改造前的问卷流程", caption: "改造前" },
+    { src: after, alt: "改造后的问卷流程", caption: "改造后" },
+  ]}
+  columns={2}
+/>
+
+外部视频嵌入（provider + id，title 必填）：
+
+<VideoEmbed provider="youtube" id="dQw4w9WgXcQ" title="功能演示视频" />
+
+自托管视频（src 指向 public/media/，title 必填）：
+
+<VideoEmbed src="/media/demo.mp4" poster="/media/demo-poster.png" title="功能演示视频" />
+*/}
