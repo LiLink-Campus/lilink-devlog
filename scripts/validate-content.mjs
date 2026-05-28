@@ -291,7 +291,7 @@ for (const file of files) {
   // d. Media paths ----------------------------------------------------------
   // cover
   if (data.cover && typeof data.cover === "string") {
-    const coverPath = path.resolve(postDir, data.cover);
+    const coverPath = path.resolve(postsDir, data.cover);
     if (!fileExists(coverPath)) {
       addProblem(file, `cover image not found: "${data.cover}"`);
     }
@@ -304,7 +304,7 @@ for (const file of files) {
     const ref = im[1];
     // Only validate asset-like imports (images/media), not component imports.
     if (/\.(png|jpe?g|gif|webp|avif|svg|mp4|webm|mov)$/i.test(ref)) {
-      const abs = path.resolve(postDir, ref);
+      const abs = path.resolve(postsDir, ref);
       if (!fileExists(abs)) {
         addProblem(file, `imported asset not found: "${ref}"`);
       }
@@ -336,7 +336,7 @@ for (const file of files) {
         const abs = path.join(publicDir, src.replace(/^\//, ""));
         if (!fileExists(abs)) addProblem(file, `markdown image not found: "${src}"`);
       } else if (src.startsWith(".")) {
-        const abs = path.resolve(postDir, src);
+        const abs = path.resolve(postsDir, src);
         if (!fileExists(abs)) addProblem(file, `markdown image not found: "${src}"`);
       }
     }
