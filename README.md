@@ -64,6 +64,12 @@ npm run ci         # = validate && check && build（CI 同款）
 npm run og:image   # 重新生成 public/og-default.png
 ```
 
+## 搜索
+
+`/search` 提供站内模糊搜索，覆盖标题、摘要、标签、作者与正文。构建时在
+`src/pages/search-index.json.ts` 生成静态索引 `/search-index.json`（仅含
+`published` 文章），前端在 `src/lib/search.ts` 中做无依赖的模糊匹配与排序。
+
 ## 部署
 
 部署到 Vercel（framework 预设 `astro`，见 `vercel.json`）。站点公开 URL 可通过环境变量 `DEVLOG_SITE_URL` 覆盖，默认 `https://devlog.lilink.top`。
