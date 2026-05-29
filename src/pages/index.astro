@@ -104,7 +104,7 @@ const jsonLd = {
         <div class="reader">
           {posts.map((post, i) => {
             const Content = bodies.get(post.id)!;
-            const { title, summary, publishedAt, authors, tags, cover } = post.data;
+            const { title, summary, publishedAt, authors, tags, cover, coverAlt } = post.data;
             const newer = posts[i - 1]; // 时间上更新的一条（数组为最新在前）
             const older = posts[i + 1]; // 时间上更早的一条
             return (
@@ -133,7 +133,7 @@ const jsonLd = {
                   <Image
                     class="page-cover"
                     src={cover}
-                    alt={title}
+                    alt={coverAlt ?? title}
                     widths={[480, 960]}
                   />
                 ) : null}

@@ -13,7 +13,7 @@ interface Props {
 }
 
 const { post } = Astro.props;
-const { title, summary, publishedAt, authors, tags, cover, coverAlt } = post.data;
+const { title, summary, publishedAt, updatedAt, authors, tags, cover, coverAlt } = post.data;
 
 const ogImage = `/og/${post.id}.png`;
 const url = new URL(postPath(post), Astro.site).href;
@@ -23,6 +23,7 @@ const jsonLd = {
   headline: title,
   description: summary,
   datePublished: toIsoDate(publishedAt),
+  ...(updatedAt ? { dateModified: toIsoDate(updatedAt) } : {}),
   inLanguage: "zh-CN",
   author: resolveAuthors(authors).map((a) => ({
     "@type": a.id === "lilink-team" ? "Organization" : "Person",
@@ -59,6 +60,12 @@ const jsonLd = {
         <span class="week">{formatWeekLabel(publishedAt)}</span>
         <span class="dot" aria-hidden="true">·</span>
         <span class="by"><AuthorByline ids={authors} /></span>
+        {updatedAt ? (
+          <>
+            <span class="dot" aria-hidden="true">·</span>
+            <span class="updated">更新于 {formatPublishedDate(updatedAt)}</span>
+          </>
+        ) : null}
       </p>
       <h1>{title}</h1>
       <p class="summary">{summary}</p>

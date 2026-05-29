@@ -30,6 +30,8 @@ const NON_PUBLIC_STATUSES = new Set(["draft", "review"]);
 const SUMMARY_MAX = 120;
 const TAGS_MAX = 4;
 const FILENAME_RE = /^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)\.mdx$/;
+// Shared id / slug shape: lowercase letters, digits, single hyphens.
+const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // ── reporting ─────────────────────────────────────────────────────────────
 // Problems are bucketed by a label (a filename, or a synthetic group like the
@@ -141,6 +143,8 @@ function validateSource() {
   bucket("src/content/tags.json");
   const authors = loadRegistry(authorsJsonPath, "src/content/authors.json");
   const tags = loadRegistry(tagsJsonPath, "src/content/tags.json");
+  validateRegistryShape(authors, "src/content/authors.json");
+  validateRegistryShape(tags, "src/content/tags.json");
   const authorIds = new Set(Object.keys(authors));
   const tagIds = new Set(Object.keys(tags));
 
@@ -158,9 +162,46 @@ function validateSource() {
     warn("src/content/posts", "没有发现任何待校验的 .mdx 文章。");
   }
 
+  const slugOwners = new Map(); // effective slug -> [fileId, ...]
   for (const file of files) {
     bucket(`src/content/posts/${file}`); // list every post in the report, even when clean
-    validatePost(file, { authorIds, tagIds });
+    const info = validatePost(file, { authorIds, tagIds });
+    if (info) {
+      const owners = slugOwners.get(info.effectiveSlug) ?? [];
+      owners.push(info.fileId);
+      slugOwners.set(info.effectiveSlug, owners);
+    }
+  }
+
+  // Two posts must never resolve to the same /posts/<slug> URL.
+  for (const [slug, owners] of slugOwners) {
+    if (owners.length > 1) {
+      for (const fileId of owners) {
+        err(
+          `src/content/posts/${fileId}.mdx`,
+          `slug「${slug}」冲突——这些文章都解析到 /posts/${slug}：${owners.join(", ")}。给其中之一改用不同的 frontmatter slug。`,
+        );
+      }
+    }
+  }
+}
+
+// Each registry record must be keyed by its own id, and ids must be kebab-case.
+function validateRegistryShape(registry, label) {
+  for (const [key, record] of Object.entries(registry)) {
+    if (!ID_RE.test(key)) {
+      err(label, `id「${key}」格式不对——只能是小写字母、数字、连字符。`);
+    }
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+      err(label, `「${key}」的值应为对象。`);
+      continue;
+    }
+    if (record.id !== key) {
+      err(
+        label,
+        `「${key}」的内部 id 字段（${record.id ?? "缺失"}）必须与 key 一致，否则生成的链接会对不上。`,
+      );
+    }
   }
 }
 
@@ -182,7 +223,7 @@ function validatePost(file, { authorIds, tagIds }) {
   const data = parseFrontmatter(raw);
   if (!data) {
     err(label, "缺少 frontmatter（文件开头的 --- … --- 区块）。");
-    return;
+    return null;
   }
 
   // ── required fields ──
@@ -229,6 +270,13 @@ function validatePost(file, { authorIds, tagIds }) {
   if (data.updatedAt !== undefined && data.updatedAt !== "") {
     if (!normalizeDate(data.updatedAt)) {
       err(label, `updatedAt「${data.updatedAt}」不是合法日期（应为 YYYY-MM-DD）。`);
+    }
+  }
+
+  // ── slug override (optional) — becomes the /posts/<slug> path segment ──
+  if (data.slug !== undefined && data.slug !== "") {
+    if (typeof data.slug !== "string" || !ID_RE.test(data.slug)) {
+      err(label, `slug「${data.slug}」格式不对——只能是小写字母、数字、连字符（会作为 /posts/<slug> 链接路径）。`);
     }
   }
 
@@ -287,6 +335,12 @@ function validatePost(file, { authorIds, tagIds }) {
 
   // ── body checks (images exist on disk; all media has alt) ──
   validateBody(label, fullPath, raw);
+
+  // Effective URL slug, for cross-post uniqueness in validateSource.
+  const fileId = file.replace(/\.mdx$/, "");
+  const effectiveSlug =
+    typeof data.slug === "string" && data.slug !== "" ? data.slug : fileId;
+  return { fileId, effectiveSlug };
 }
 
 // Split frontmatter off, then scan the body for media problems.
@@ -306,19 +360,75 @@ function validateBody(label, fullPath, raw) {
     checkLocalImage(label, fullPath, src);
   }
 
-  // <img …> and <Figure …> components — must carry a non-empty alt, and any
-  // local src must exist.
-  const tagRe = /<(img|Figure)\b([^>]*?)\/?>/gi;
+  // <img …> / <Figure …> need a non-empty alt; <Video …> needs a non-empty
+  // title. Component src/poster are plain URLs (must be public-rooted).
+  const tagRe = /<(img|Figure|Video)\b([^>]*?)\/?>/gi;
   while ((m = tagRe.exec(body)) !== null) {
     const tag = m[1];
     const attrs = m[2];
-    const alt = attrValue(attrs, "alt");
-    if (alt === null || alt.trim() === "") {
-      err(label, `<${tag}> 缺少非空 alt 文字。`);
+    if (/^video$/i.test(tag)) {
+      const title = attrValue(attrs, "title");
+      if (title === null || title.trim() === "") {
+        err(label, "<Video> 缺少非空 title。");
+      }
+      const vsrc = attrValue(attrs, "src");
+      if (vsrc) checkLocalImage(label, fullPath, vsrc, true);
+      const poster = attrValue(attrs, "poster");
+      if (poster) checkLocalImage(label, fullPath, poster, true);
+    } else {
+      const alt = attrValue(attrs, "alt");
+      if (alt === null || alt.trim() === "") {
+        err(label, `<${tag}> 缺少非空 alt 文字。`);
+      }
+      const src = attrValue(attrs, "src");
+      if (src) checkLocalImage(label, fullPath, src, true);
     }
-    const src = attrValue(attrs, "src");
-    if (src) checkLocalImage(label, fullPath, src);
   }
+
+  // <Gallery items={[ {src, alt, caption}, … ]} /> — every item needs a
+  // non-empty alt; local src must be a public-rooted path that exists.
+  const galleryRe = /<Gallery\b([^>]*?)\/?>/gi;
+  while ((m = galleryRe.exec(body)) !== null) {
+    const itemsRaw = extractItemsArray(m[1]);
+    if (itemsRaw === null) {
+      warn(label, "<Gallery> 的 items 无法静态解析，跳过逐项校验——请确保每项都有非空 alt，且 src 为 public 根路径。");
+      continue;
+    }
+    const objs = itemsRaw.match(/\{[^{}]*\}/g) ?? [];
+    if (objs.length === 0) {
+      warn(label, "<Gallery> 未解析到任何 item。");
+    }
+    for (const obj of objs) {
+      const alt = jsObjValue(obj, "alt");
+      if (alt === null || alt.trim() === "") {
+        err(label, `<Gallery> 有一项缺少非空 alt：${obj.trim()}`);
+      }
+      const src = jsObjValue(obj, "src");
+      if (src) checkLocalImage(label, fullPath, src, true);
+    }
+  }
+}
+
+// Pull the `items={[ … ]}` array text out of a <Gallery> attribute string.
+function extractItemsArray(attrs) {
+  const at = attrs.search(/items\s*=\s*\{/);
+  if (at === -1) return null;
+  const start = attrs.indexOf("[", at);
+  if (start === -1) return null;
+  let depth = 0;
+  for (let i = start; i < attrs.length; i++) {
+    if (attrs[i] === "[") depth++;
+    else if (attrs[i] === "]" && --depth === 0) return attrs.slice(start, i + 1);
+  }
+  return null;
+}
+
+// Read a string value for `key` from a flat JS object-literal fragment.
+function jsObjValue(objText, key) {
+  const re = new RegExp(`\\b${key}\\s*:\\s*(?:"([^"]*)"|'([^']*)'|\`([^\`]*)\`)`);
+  const mm = objText.match(re);
+  if (!mm) return null;
+  return mm[1] ?? mm[2] ?? mm[3] ?? "";
 }
 
 // Read a quoted (or {"..."} ) attribute value from a tag's attribute string.
@@ -332,17 +442,31 @@ function attrValue(attrs, name) {
 
 // Only verify on-disk existence for local refs (relative, or /-rooted into
 // public/). Remote URLs and bare imported identifiers are left to Astro.
-function checkLocalImage(label, fullPath, src) {
+function checkLocalImage(label, fullPath, src, component = false) {
   if (!src) return;
   if (/^(?:https?:)?\/\//i.test(src) || src.startsWith("data:")) return; // remote / data URI
   if (src.startsWith("{") || /^[A-Za-z_$][\w$]*$/.test(src)) return; // JSX expression / imported var
 
-  let resolved;
+  // Root-absolute → must exist under public/.
   if (src.startsWith("/")) {
-    resolved = path.join(repoRoot, "public", src.replace(/^\/+/, ""));
-  } else {
-    resolved = resolveRelative(fullPath, src);
+    const resolved = path.join(repoRoot, "public", src.replace(/^\/+/, ""));
+    if (!fs.existsSync(resolved)) {
+      err(label, `引用的本地媒体不存在：${src}（解析为 ${rel(resolved)}）。`);
+    }
+    return;
   }
+
+  // Relative path: fine for Markdown images (Astro processes them), but the
+  // string-src components render a plain <img>/<video> that bypasses Astro's
+  // asset pipeline, so a relative src would 404 in production.
+  if (component) {
+    err(
+      label,
+      `富媒体组件（Figure / Gallery / Video）的 src 不支持相对路径「${src}」——请放到 public/ 并用 /media/… 这样的根路径引用（或远程 URL）。`,
+    );
+    return;
+  }
+  const resolved = resolveRelative(fullPath, src);
   if (resolved && !fs.existsSync(resolved)) {
     err(label, `引用的本地图片不存在：${src}（解析为 ${rel(resolved)}）。`);
   }
@@ -399,19 +523,22 @@ function validateBuild() {
     .readdirSync(postsDir)
     .filter((f) => f.endsWith(".mdx") && !f.startsWith("_"));
 
-  // Collect ids whose status is draft/review — these must NOT ship.
-  const nonPublicIds = [];
+  // Collect non-public posts (draft/review) — these must NOT ship. The built
+  // page path follows postSlug(): the frontmatter `slug` override, else file id.
+  const nonPublic = [];
   for (const file of files) {
     const data = parseFrontmatter(fs.readFileSync(path.join(postsDir, file), "utf8"));
     const status = data && data.status ? data.status : "published";
     if (NON_PUBLIC_STATUSES.has(status)) {
-      nonPublicIds.push({ id: file.replace(/\.mdx$/, ""), status });
+      const id = file.replace(/\.mdx$/, "");
+      const slug = data && typeof data.slug === "string" && data.slug ? data.slug : id;
+      nonPublic.push({ id, slug, status });
     }
   }
 
-  // 1) No dist/posts/<id>/index.html for any non-public post.
-  for (const { id, status } of nonPublicIds) {
-    const page = path.join(distDir, "posts", id, "index.html");
+  // 1) No dist/posts/<slug>/index.html for any non-public post.
+  for (const { id, slug, status } of nonPublic) {
+    const page = path.join(distDir, "posts", slug, "index.html");
     if (fs.existsSync(page)) {
       err(
         label,
@@ -420,7 +547,7 @@ function validateBuild() {
     }
   }
 
-  // 2) search-index.json (if built) must contain none of those ids.
+  // 2) search-index.json (if built) must contain none of those ids or URLs.
   const searchIndexPath = path.join(distDir, "search-index.json");
   if (fs.existsSync(searchIndexPath)) {
     let entries = [];
@@ -433,8 +560,11 @@ function validateBuild() {
     const indexedIds = new Set(
       entries.map((e) => (e && typeof e === "object" ? e.id : undefined)).filter(Boolean),
     );
-    for (const { id, status } of nonPublicIds) {
-      if (indexedIds.has(id)) {
+    const indexedUrls = new Set(
+      entries.map((e) => (e && typeof e === "object" ? e.url : undefined)).filter(Boolean),
+    );
+    for (const { id, slug, status } of nonPublic) {
+      if (indexedIds.has(id) || indexedUrls.has(`/posts/${slug}`)) {
         err(
           label,
           `状态为 ${status} 的文章 ${id} 不应出现在 dist/search-index.json 中。`,

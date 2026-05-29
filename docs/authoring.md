@@ -105,8 +105,9 @@ devlog 走 PR + CI + 合并自动部署的流程：
 - `authors` 里每个 id 都在 `src/content/authors.json`；
 - `tags` 里每个 id 都在 `src/content/tags.json`，且不超过 4 个；
 - 若设了 `cover`：封面文件确实存在，且写了 `coverAlt`；
-- 正文里引用的本地图片路径确实存在；
-- 每个 Markdown 图片 `![alt](src)` 和每个 `<img>` / `<Figure>` 都有**非空 alt**；
+- 正文里引用的本地图片 / 视频路径确实存在；富媒体组件（`<Figure>` / `<Gallery>` / `<Video>`）的本地 `src` 用 `public/` 根路径（`/media/...`），不是相对路径；
+- 每个 Markdown 图片 `![alt](src)`、`<img>` / `<Figure>`、`<Gallery>` 的每个 item 都有**非空 alt**，每个 `<Video>` 都有**非空 title**；
+- 若设了 frontmatter `slug` 覆盖：它是小写短横线格式，且全站唯一（不与其它文章的 slug / 文件名冲突）；
 - 文件名形如 `YYYY-MM-DD-<slug>.mdx`（slug 为小写字母 / 数字 / 连字符），且文件名里的日期等于 `publishedAt`。
 
 两条命令：
@@ -177,11 +178,13 @@ npm run validate:build  # 加 --check-build，校验 dist/ 产物（一般交给
 
 正文渲染时会注入一组媒体组件（`src/components/mdx.ts`，通过 `<Content components={mdxComponents} />` 传入），所以**在 `.mdx` 里可直接使用这些标签，无需 import**：
 
+> **媒体放哪里**：`<Figure>` / `<Gallery>` / `<Video>` 的 `src` 是**普通 URL**，不走 Astro 资源管线。把图片 / 视频放到 `public/`（例如 `public/media/2026-06-03/foo.png`），在 MDX 里用**根路径** `/media/2026-06-03/foo.png` 引用，或用远程 URL，并随 PR 一起提交。**不要**用 `./assets/` 相对路径——相对路径只对 frontmatter 的 `cover:` 有效（它走 `image()` 优化管线）。
+
 ### 8.1 `<Figure>` —— 单图（带可选图注）
 
 ```mdx
 <Figure
-  src="./assets/before-after.png"
+  src="/media/2026-06-03/before-after.png"
   alt="改版前后的搜索结果对比"
   caption="左：旧版；右：新版，结果出现更快"
   width={1200}
@@ -189,11 +192,11 @@ npm run validate:build  # 加 --check-build，校验 dist/ 产物（一般交给
 />
 ```
 
-- `alt` **必填**（无障碍 + 校验都会要求）；`caption` / `width` / `height` 可选。
-- 图片放在文章同目录的 `assets/` 下，用相对路径引用，并随 PR 一起提交。
+- `alt` **必填**（无障碍 + 校验都会要求）；`caption` / `width` / `height` 可选（建议填 `width`/`height` 以减少图片加载时的布局抖动）。
+- 图片放在 `public/`（如 `public/media/2026-06-03/before-after.png`），用**根路径** `/media/...` 引用（或远程 URL），并随 PR 一起提交。**不支持** `./assets/` 相对路径（见上「媒体放哪里」）。
 - 图片默认 `loading="lazy"`、`decoding="async"`。
 
-也可以用普通 Markdown 图片 `![替代文字](./assets/x.png)`，同样**必须写非空替代文字**。
+也可以用普通 Markdown 图片 `![替代文字](/media/2026-06-03/x.png)`，同样**必须写非空替代文字**。
 
 ### 8.2 `<Gallery>` —— 多图网格
 
@@ -201,20 +204,20 @@ npm run validate:build  # 加 --check-build，校验 dist/ 产物（一般交给
 <Gallery
   columns={3}
   items={[
-    { src: "./assets/a.png", alt: "第一张", caption: "可选图注" },
-    { src: "./assets/b.png", alt: "第二张" },
-    { src: "./assets/c.png", alt: "第三张" }
+    { src: "/media/2026-06-03/a.png", alt: "第一张", caption: "可选图注" },
+    { src: "/media/2026-06-03/b.png", alt: "第二张" },
+    { src: "/media/2026-06-03/c.png", alt: "第三张" }
   ]}
 />
 ```
 
-- 每个 item 的 `alt` **必填**；`caption` 可选；`columns` 可选（响应式网格）。
+- 每个 item 的 `alt` **必填**；`caption` / `width` / `height` 可选；`columns` 可选（响应式网格）。src 同样用 `public/` 根路径。
 
 ### 8.3 `<Video>` —— 本地或第三方视频
 
 ```mdx
 <!-- 本地视频 -->
-<Video title="新版搜索演示" src="./assets/demo.mp4" poster="./assets/demo-poster.png" />
+<Video title="新版搜索演示" src="/media/2026-06-03/demo.mp4" poster="/media/2026-06-03/demo-poster.png" />
 
 <!-- 第三方：点击前不发起任何第三方请求（隐私友好遮罩） -->
 <Video title="发布回顾" youtube="VIDEO_ID" />
@@ -225,7 +228,7 @@ npm run validate:build  # 加 --check-build，校验 dist/ 产物（一般交给
 - 给了 `src` 就用本地 `<video controls preload="none">`；
 - 给了 `youtube` / `bilibili` 则显示一个「点击加载」遮罩，**用户点击前不会向第三方发起任何请求**，点击后才嵌入 iframe。这与 devlog 的隐私取向一致。
 
-> 校验脚本会确保每个 `<Figure>` / `<img>` 有非空 `alt`、引用的本地图片确实存在。`<Video>` 的 `title` 在组件层是必填项。
+> 校验脚本会确保每个 `<Figure>` / `<img>` 与 `<Gallery>` 的每个 item 有非空 `alt`、每个 `<Video>` 有非空 `title`，引用的本地媒体确实存在，且组件 `src` 用的是 `public/` 根路径（不是 `./assets/` 相对路径）。
 
 ---
 
