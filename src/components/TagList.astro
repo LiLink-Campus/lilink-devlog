@@ -1,0 +1,74 @@
+---
+import { resolveTags, tagHref } from "../lib/tags";
+
+interface Props {
+  ids: string[];
+  /** "sm" for inline meta lines, "md" for standalone listings (default). */
+  size?: "sm" | "md";
+}
+
+const { ids, size = "md" } = Astro.props;
+const tags = resolveTags(ids);
+---
+
+{
+  tags.length > 0 ? (
+    <ul class:list={["tags", size]} aria-label="标签">
+      {tags.map((tag) => (
+        <li>
+          <a class="chip" href={tagHref(tag.id)}>
+            {tag.name}
+          </a>
+        </li>
+      ))}
+    </ul>
+  ) : null
+}
+
+<style>
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-tinted);
+    color: var(--color-text-secondary);
+    line-height: 1;
+    white-space: nowrap;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease,
+      background 0.15s ease;
+  }
+
+  .chip:hover {
+    color: var(--color-brand);
+    border-color: var(--color-brand);
+    background: var(--color-brand-tint);
+  }
+
+  /* Default — standalone listings (tag index, post foot) */
+  .md .chip {
+    padding: var(--space-2) var(--space-4);
+    font-size: 0.85rem;
+  }
+
+  /* Compact — inline meta lines */
+  .sm {
+    gap: var(--space-1);
+  }
+
+  .sm .chip {
+    padding: 0.2rem var(--space-3);
+    font-size: 0.74rem;
+  }
+</style>

@@ -1,6 +1,9 @@
 ---
 import { Image } from "astro:assets";
 import { render } from "astro:content";
+import AuthorByline from "../components/AuthorByline.astro";
+import TagList from "../components/TagList.astro";
+import { mdxComponents } from "../components/mdx";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import {
   formatEntryDate,
@@ -101,7 +104,7 @@ const jsonLd = {
         <div class="reader">
           {posts.map((post, i) => {
             const Content = bodies.get(post.id)!;
-            const { title, summary, publishedAt, authors, cover } = post.data;
+            const { title, summary, publishedAt, authors, tags, cover } = post.data;
             const newer = posts[i - 1]; // 时间上更新的一条（数组为最新在前）
             const older = posts[i + 1]; // 时间上更早的一条
             return (
@@ -118,10 +121,13 @@ const jsonLd = {
                     <span class="dot" aria-hidden="true">·</span>
                     <span class="week">{formatWeekLabel(publishedAt)}</span>
                     <span class="dot" aria-hidden="true">·</span>
-                    <span class="by">{authors.join("、")}</span>
+                    <span class="by"><AuthorByline ids={authors} /></span>
                   </p>
                   <h2>{title}</h2>
                   <p class="page-summary">{summary}</p>
+                  <div class="page-tags">
+                    <TagList ids={tags} size="sm" />
+                  </div>
                 </header>
                 {cover ? (
                   <Image
@@ -132,7 +138,7 @@ const jsonLd = {
                   />
                 ) : null}
                 <div class="prose">
-                  <Content />
+                  <Content components={mdxComponents} />
                 </div>
                 <footer class="page-foot">
                   <div class="pager">
@@ -444,6 +450,15 @@ const jsonLd = {
     line-height: 1.6;
     color: var(--color-text-secondary);
     text-wrap: pretty;
+  }
+
+  /* Subtle tag chips under the summary; collapses when the entry has no tags. */
+  .page-tags {
+    margin-top: var(--space-3);
+  }
+
+  .page-tags:empty {
+    margin-top: 0;
   }
 
   .page-cover {

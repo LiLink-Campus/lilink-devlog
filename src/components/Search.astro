@@ -1,0 +1,523 @@
+---
+/**
+ * Self-contained site search.
+ *
+ * Renders a trigger button + a native <dialog> modal. On first open the inline
+ * script lazy-fetches /search-index.json (built from published posts only) and
+ * caches it; typing runs a hand-rolled weighted fuzzy match over
+ * title > tags > authors > summary > body and lists the top matches as links.
+ *
+ * No runtime/npm dependency. Keyboard-accessible: native <dialog> focus trap,
+ * Escape / close button dismiss, labelled input, results are real <a>s.
+ *
+ * Mount once (e.g. inside Header). It needs no props.
+ */
+---
+
+<div class="search">
+  <button type="button" class="search-trigger" data-search-open aria-haspopup="dialog">
+    <svg
+      class="icon"
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="7"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+    <span class="label">搜索</span>
+  </button>
+
+  <dialog class="search-dialog" data-search-dialog aria-label="站内搜索">
+    <form class="search-box" method="dialog" data-search-form>
+      <svg
+        class="icon search-box-icon"
+        viewBox="0 0 24 24"
+        width="18"
+        height="18"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <label class="visually-hidden" for="search-input">搜索文章</label>
+      <input
+        id="search-input"
+        type="search"
+        class="search-input"
+        placeholder="搜索更新、标题、标签…"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        data-search-input
+      />
+      <button
+        type="button"
+        class="search-close"
+        data-search-close
+        aria-label="关闭搜索"
+      >
+        Esc
+      </button>
+    </form>
+
+    <div class="search-results" data-search-results aria-live="polite">
+      <p class="search-hint" data-search-hint>输入关键词，搜索全部更新。</p>
+      <ul class="search-list" data-search-list hidden></ul>
+    </div>
+  </dialog>
+</div>
+
+<script>
+  type SearchItem = {
+    id: string;
+    url: string;
+    title: string;
+    summary: string;
+    date: string;
+    tags: string[];
+    authors: string[];
+    body: string;
+  };
+
+  const root = document.currentScript?.closest(".search") as HTMLElement | null;
+  // Fallback to document if the script is hoisted out of the component scope.
+  const scope: ParentNode = root ?? document;
+
+  const triggerEl = scope.querySelector<HTMLButtonElement>("[data-search-open]");
+  const dialogEl = scope.querySelector<HTMLDialogElement>("[data-search-dialog]");
+  const formEl = scope.querySelector<HTMLFormElement>("[data-search-form]");
+  const inputEl = scope.querySelector<HTMLInputElement>("[data-search-input]");
+  const closeBtn = scope.querySelector<HTMLButtonElement>("[data-search-close]");
+  const listEl = scope.querySelector<HTMLUListElement>("[data-search-list]");
+  const hintEl = scope.querySelector<HTMLParagraphElement>("[data-search-hint]");
+
+  if (triggerEl && dialogEl && formEl && inputEl && listEl && hintEl) {
+    // Re-bind to non-null consts so closures below keep the narrowed type.
+    const trigger = triggerEl;
+    const dialog = dialogEl;
+    const form = formEl;
+    const input = inputEl;
+    const list = listEl;
+    const hint = hintEl;
+
+    const MAX_RESULTS = 12;
+    let index: SearchItem[] | null = null;
+    let loading: Promise<SearchItem[]> | null = null;
+
+    // --- data ---------------------------------------------------------------
+    async function loadIndex(): Promise<SearchItem[]> {
+      if (index) return index;
+      if (!loading) {
+        loading = fetch("/search-index.json")
+          .then((res) => (res.ok ? res.json() : []))
+          .then((data: SearchItem[]) => {
+            index = Array.isArray(data) ? data : [];
+            return index;
+          })
+          .catch(() => {
+            index = [];
+            return index;
+          });
+      }
+      return loading;
+    }
+
+    // --- scoring ------------------------------------------------------------
+    // Hand-rolled, dependency-free. Per query token we score each field; the
+    // strongest field hit wins for that token, multiplied by the field weight.
+    // A result is kept only if EVERY token matches somewhere (AND semantics).
+
+    /** Substring (best, position-aware) or in-order subsequence (fuzzy). */
+    function fieldScore(haystack: string, needle: string): number {
+      if (!needle) return 0;
+      const hay = haystack.toLowerCase();
+      const idx = hay.indexOf(needle);
+      if (idx === 0) return 1; // prefix match
+      if (idx > 0) return 0.8; // substring match
+      // Subsequence: characters appear in order but not contiguous.
+      let h = 0;
+      for (let n = 0; n < needle.length; n += 1) {
+        h = hay.indexOf(needle[n], h);
+        if (h === -1) return 0;
+        h += 1;
+      }
+      return 0.4;
+    }
+
+    function scoreItem(item: SearchItem, tokens: string[]): number {
+      const fields: Array<[string, number]> = [
+        [item.title, 6],
+        [item.tags.join(" "), 4],
+        [item.authors.join(" "), 3],
+        [item.summary, 2],
+        [item.body, 1],
+      ];
+      let total = 0;
+      for (const token of tokens) {
+        let best = 0;
+        for (const [text, weight] of fields) {
+          const s = fieldScore(text, token) * weight;
+          if (s > best) best = s;
+        }
+        if (best === 0) return 0; // this token matched nothing -> drop result
+        total += best;
+      }
+      return total;
+    }
+
+    function search(query: string): SearchItem[] {
+      const tokens = query
+        .toLowerCase()
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+      if (tokens.length === 0 || !index) return [];
+      return index
+        .map((item) => ({ item, score: scoreItem(item, tokens) }))
+        .filter((r) => r.score > 0)
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          // Tiebreak: newer first (ISO dates sort lexicographically).
+          return a.item.date < b.item.date ? 1 : -1;
+        })
+        .slice(0, MAX_RESULTS)
+        .map((r) => r.item);
+    }
+
+    // --- rendering ----------------------------------------------------------
+    function escapeHtml(value: string): string {
+      return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function render(query: string): void {
+      if (!query.trim()) {
+        list.hidden = true;
+        list.innerHTML = "";
+        hint.hidden = false;
+        hint.textContent = "输入关键词，搜索全部更新。";
+        return;
+      }
+      const results = search(query);
+      if (results.length === 0) {
+        list.hidden = true;
+        list.innerHTML = "";
+        hint.hidden = false;
+        hint.textContent = `没有找到与「${query.trim()}」相关的更新。`;
+        return;
+      }
+      hint.hidden = true;
+      list.hidden = false;
+      list.innerHTML = results
+        .map((item) => {
+          const meta = [item.date, ...item.tags].map(escapeHtml).join(" · ");
+          return `
+            <li class="search-item">
+              <a href="${escapeHtml(item.url)}">
+                <span class="search-item-title">${escapeHtml(item.title)}</span>
+                <span class="search-item-summary">${escapeHtml(item.summary)}</span>
+                <span class="search-item-meta">${meta}</span>
+              </a>
+            </li>`;
+        })
+        .join("");
+    }
+
+    // --- open / close -------------------------------------------------------
+    function open(): void {
+      if (!dialog.open) dialog.showModal();
+      // Prime the index in the background on first open.
+      void loadIndex().then(() => {
+        if (dialog.open && input.value.trim()) render(input.value);
+      });
+      // Defer focus until the dialog is painted.
+      requestAnimationFrame(() => input.focus());
+    }
+
+    function close(): void {
+      if (dialog.open) dialog.close();
+    }
+
+    trigger.addEventListener("click", open);
+    closeBtn?.addEventListener("click", close);
+
+    // Click on the backdrop (outside the inner box) closes the dialog.
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) close();
+    });
+
+    // Native <dialog> already fires `cancel` on Escape; let it close.
+    dialog.addEventListener("close", () => {
+      input.value = "";
+      render("");
+    });
+
+    // The form uses method="dialog"; stop Enter from closing — navigate to the
+    // first result instead, matching typical search UX.
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const first = list.querySelector<HTMLAnchorElement>("a");
+      if (first) window.location.href = first.href;
+    });
+
+    input.addEventListener("input", () => render(input.value));
+
+    // Global shortcut: "/" focuses search when not already typing somewhere.
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "/" || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      event.preventDefault();
+      open();
+    });
+  }
+</script>
+
+<style>
+  .search {
+    display: inline-flex;
+  }
+
+  .search-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border-strong);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: 0.92rem;
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .search-trigger:hover {
+    color: var(--color-brand);
+    border-color: var(--color-brand);
+  }
+
+  .search-trigger:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .search-trigger .icon {
+    flex-shrink: 0;
+  }
+
+  /* --- dialog ------------------------------------------------------------- */
+  .search-dialog {
+    width: min(100% - 2rem, 38rem);
+    max-height: min(80vh, 40rem);
+    margin-inline: auto;
+    margin-top: 12vh;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+
+  .search-dialog::backdrop {
+    background: rgba(var(--color-text-rgb), 0.38);
+    backdrop-filter: blur(2px);
+  }
+
+  /* Light open animation; respects reduced-motion below. */
+  .search-dialog[open] {
+    animation: search-pop 0.16s ease-out;
+  }
+
+  @keyframes search-pop {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface-tinted);
+  }
+
+  .search-box-icon {
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+  }
+
+  .search-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    font-size: 1.05rem;
+    line-height: 1.4;
+  }
+
+  .search-input::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  .search-input:focus {
+    outline: none;
+  }
+
+  /* Hide the native search clear affordance for a cleaner book feel. */
+  .search-input::-webkit-search-decoration,
+  .search-input::-webkit-search-cancel-button {
+    appearance: none;
+  }
+
+  .search-close {
+    flex-shrink: 0;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-xs);
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .search-close:hover {
+    color: var(--color-brand);
+    border-color: var(--color-brand);
+  }
+
+  .search-results {
+    max-height: calc(min(80vh, 40rem) - 4.5rem);
+    overflow-y: auto;
+    padding: var(--space-3);
+  }
+
+  .search-hint {
+    margin: 0;
+    padding: var(--space-4) var(--space-3);
+    color: var(--color-text-muted);
+    font-size: 0.92rem;
+    text-wrap: pretty;
+  }
+
+  .search-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .search-item a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    transition: background 0.12s ease;
+  }
+
+  .search-item a:hover,
+  .search-item a:focus-visible {
+    background: var(--color-brand-tint);
+    outline: none;
+  }
+
+  .search-item-title {
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    font-weight: 600;
+    line-height: 1.35;
+    text-wrap: balance;
+  }
+
+  .search-item a:hover .search-item-title,
+  .search-item a:focus-visible .search-item-title {
+    color: var(--color-brand);
+  }
+
+  .search-item-summary {
+    color: var(--color-text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    text-wrap: pretty;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .search-item-meta {
+    color: var(--color-text-muted);
+    font-size: 0.76rem;
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Hide the trigger label on very narrow screens — keep just the icon. */
+  @media (max-width: 30rem) {
+    .search-trigger .label {
+      display: none;
+    }
+    .search-trigger {
+      padding: 0.4rem 0.55rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .search-dialog[open] {
+      animation: none;
+    }
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+</style>

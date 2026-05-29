@@ -1,6 +1,7 @@
 import rss from "@astrojs/rss";
 import type { APIContext } from "astro";
 import { getPublishedPosts } from "../lib/posts";
+import { resolveTags } from "../lib/tags";
 
 export async function GET(context: APIContext) {
   const posts = await getPublishedPosts();
@@ -18,6 +19,7 @@ export async function GET(context: APIContext) {
       description: post.data.summary,
       pubDate: post.data.publishedAt,
       link: `/posts/${post.id}`,
+      categories: resolveTags(post.data.tags).map((t) => t.name),
     })),
     customData: "<language>zh-CN</language>",
   });

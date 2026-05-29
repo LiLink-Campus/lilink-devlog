@@ -1,5 +1,6 @@
 ---
 import BrandMark from "./BrandMark.astro";
+import Search from "./Search.astro";
 
 const mainSite = "https://www.lilink.top";
 ---
@@ -8,6 +9,8 @@ const mainSite = "https://www.lilink.top";
   <div class="container inner">
     <BrandMark href="/" />
     <nav class="nav" aria-label="主导航">
+      <Search />
+      <a href="/tags">标签</a>
       <a href="/rss.xml">RSS</a>
       <a class="back" href={mainSite}>回到 LiLink</a>
     </nav>
