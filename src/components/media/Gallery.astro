@@ -31,30 +31,3 @@ const cols = Math.min(Math.max(Math.round(columns), 1), 4);
     </div>
   ) : null
 }
-
-<style>
-  .gallery {
-    /* auto-fit + minmax means it naturally drops to fewer columns (down to 1)
-       as the container narrows, while never exceeding --cols on wide screens. */
-    display: grid;
-    grid-template-columns: repeat(
-      auto-fit,
-      minmax(min(14rem, 100%), 1fr)
-    );
-    gap: var(--space-4);
-    margin: var(--space-6) 0;
-  }
-
-  /* The figures inside a gallery shed their own outer margin — the grid gap
-     owns the spacing now. */
-  .gallery :global(.figure) {
-    margin: 0;
-  }
-
-  /* On comfortably wide viewports, honour the author's requested column count. */
-  @media (min-width: 48rem) {
-    .gallery {
-      grid-template-columns: repeat(var(--cols), 1fr);
-    }
-  }
-</style>
