@@ -4,6 +4,16 @@ import { getTag, type Tag } from "./tags";
 
 export type Post = CollectionEntry<"posts">;
 
+/** A post's URL slug — the optional frontmatter `slug` override, else its file id. */
+export function postSlug(post: Post): string {
+  return post.data.slug ?? post.id;
+}
+
+/** Canonical site path for a post, e.g. `/posts/2026-05-27-devlog-launch`. */
+export function postPath(post: Post): string {
+  return `/posts/${postSlug(post)}`;
+}
+
 /** Published posts, newest first. Non-published (draft/review) appear only in `astro dev`. */
 export async function getPublishedPosts(): Promise<Post[]> {
   const posts = await getCollection("posts", ({ data }) =>

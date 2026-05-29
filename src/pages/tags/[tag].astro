@@ -2,7 +2,7 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { tagIds } from "../../content/tags";
 import { getTag } from "../../lib/tags";
-import { getPostsByTag } from "../../lib/posts";
+import { getPostsByTag, postPath } from "../../lib/posts";
 import { formatPublishedDate, toIsoDate } from "../../lib/dates";
 
 export async function getStaticPaths() {
@@ -39,7 +39,7 @@ const description = tag?.description
         <ol class="post-list">
           {posts.map((post) => (
             <li class="entry">
-              <a class="entry-link" href={`/posts/${post.id}`}>
+              <a class="entry-link" href={postPath(post)}>
                 <time class="date" datetime={toIsoDate(post.data.publishedAt)}>
                   {formatPublishedDate(post.data.publishedAt)}
                 </time>
