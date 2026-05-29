@@ -31,7 +31,10 @@ const posts = defineCollection({
         // Tag ids — at most 4, each must exist in src/content/tags.json (validated below).
         tags: z.array(z.string()).max(4, "最多只能有 4 个标签").default([]),
         // Editorial workflow: draft -> review -> published. Only `published` ships in prod.
-        status: z.enum(["draft", "review", "published"]).default("published"),
+        // Required, no default — keep this in lockstep with validate-content.mjs, which
+        // also treats `status` as a mandatory field (a default here would let a post pass
+        // the schema while still failing validation).
+        status: z.enum(["draft", "review", "published"]),
         // Highlights an occasional milestone entry on the timeline.
         featured: z.boolean().default(false),
       })

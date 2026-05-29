@@ -3,8 +3,9 @@
  * Dedicated full-page site search.
  *
  * A big centred search box with the results listed inline below it. The inline
- * script lazy-fetches /search-index.json (published posts only) and runs the
- * same dependency-free weighted fuzzy match used elsewhere
+ * script lazy-fetches /search-index.json (published posts only) and runs a
+ * dependency-free, token-based weighted match: Intl.Segmenter splits both the
+ * query and each field into words, scored by field
  * (title > tags > authors > summary > body).
  *
  * The query is synced to the URL as ?q=…&page=…: on load the page reads it,
@@ -90,17 +91,60 @@ const description = "在 LiLink 开发日志里搜索全部更新：按标题、
     const PAGE_SIZE = 24;
     const QUERY_PARAM = "q";
     const PAGE_PARAM = "page";
-    let index: SearchItem[] | null = null;
-    let loading: Promise<SearchItem[]> | null = null;
+    // Pre-tokenised view of one item: each field's word tokens + its weight.
+    type IndexedItem = {
+      item: SearchItem;
+      fields: Array<{ tokens: string[]; weight: number }>;
+    };
+
+    let index: IndexedItem[] | null = null;
+    let loading: Promise<IndexedItem[]> | null = null;
+
+    // --- tokenisation -------------------------------------------------------
+    // Intl.Segmenter gives real CJK word boundaries (e.g. 「开发日志」→「开发」「日志」),
+    // replacing the old whitespace split + subsequence fuzzy that produced noisy
+    // matches for Chinese. On engines without Segmenter (very old browsers) it
+    // falls back to whitespace splitting — fine for spaced/Latin queries, but
+    // unspaced CJK degrades to whole-string tokens. Segmenter support is wide.
+    const segmenter =
+      typeof Intl !== "undefined" && "Segmenter" in Intl
+        ? new Intl.Segmenter("zh-CN", { granularity: "word" })
+        : null;
+
+    function tokenize(text: string): string[] {
+      const lower = (text || "").toLowerCase();
+      if (!segmenter) return lower.split(/\s+/).filter(Boolean);
+      const out: string[] = [];
+      for (const seg of segmenter.segment(lower)) {
+        if (seg.isWordLike) out.push(seg.segment);
+      }
+      return out;
+    }
+
+    // Tokenise every field once at load time so per-keystroke search only has to
+    // tokenise the (short) query. Weights: title > tags > authors > summary > body.
+    function toIndexed(item: SearchItem): IndexedItem {
+      return {
+        item,
+        fields: [
+          { tokens: tokenize(item.title), weight: 6 },
+          { tokens: tokenize(item.tags.join(" ")), weight: 4 },
+          { tokens: tokenize(item.authors.join(" ")), weight: 3 },
+          { tokens: tokenize(item.summary), weight: 2 },
+          { tokens: tokenize(item.body), weight: 1 },
+        ],
+      };
+    }
 
     // --- data ---------------------------------------------------------------
-    async function loadIndex(): Promise<SearchItem[]> {
+    async function loadIndex(): Promise<IndexedItem[]> {
       if (index) return index;
       if (!loading) {
         loading = fetch("/search-index.json")
           .then((res) => (res.ok ? res.json() : []))
           .then((data: SearchItem[]) => {
-            index = Array.isArray(data) ? data : [];
+            const items: SearchItem[] = Array.isArray(data) ? data : [];
+            index = items.map(toIndexed);
             return index;
           })
           .catch(() => {
@@ -112,61 +156,49 @@ const description = "在 LiLink 开发日志里搜索全部更新：按标题、
     }
 
     // --- scoring ------------------------------------------------------------
-    // Hand-rolled, dependency-free. Per query token we score each field; the
-    // strongest field hit wins for that token, multiplied by the field weight.
-    // A result is kept only if EVERY token matches somewhere (AND semantics).
+    // Token-based weighted scoring with soft-AND. Each query token scores against
+    // every field; its strongest field hit (exact > prefix) times the field weight
+    // wins. Items that match more of the query rank higher, but a partial match is
+    // kept (soft-AND) rather than dropped outright.
 
-    /** Substring (best, position-aware) or in-order subsequence (fuzzy). */
-    function fieldScore(haystack: string, needle: string): number {
-      if (!needle) return 0;
-      const hay = haystack.toLowerCase();
-      const idx = hay.indexOf(needle);
-      if (idx === 0) return 1; // prefix match
-      if (idx > 0) return 0.8; // substring match
-      // Subsequence: characters appear in order but not contiguous.
-      let h = 0;
-      for (let n = 0; n < needle.length; n += 1) {
-        h = hay.indexOf(needle[n], h);
-        if (h === -1) return 0;
-        h += 1;
+    /** One query token vs one field's tokens: exact (1) or prefix (0.5), else 0. */
+    function tokenFieldScore(fieldTokens: string[], queryToken: string): number {
+      let best = 0;
+      for (const ft of fieldTokens) {
+        if (ft === queryToken) return 1;
+        if (ft.startsWith(queryToken)) best = 0.5;
       }
-      return 0.4;
+      return best;
     }
 
-    function scoreItem(item: SearchItem, tokens: string[]): number {
-      const fields: Array<[string, number]> = [
-        [item.title, 6],
-        [item.tags.join(" "), 4],
-        [item.authors.join(" "), 3],
-        [item.summary, 2],
-        [item.body, 1],
-      ];
+    function scoreItem(indexed: IndexedItem, tokens: string[]): number {
       let total = 0;
+      let matched = 0;
       for (const token of tokens) {
         let best = 0;
-        for (const [text, weight] of fields) {
-          const s = fieldScore(text, token) * weight;
+        for (const { tokens: fieldTokens, weight } of indexed.fields) {
+          const s = tokenFieldScore(fieldTokens, token) * weight;
           if (s > best) best = s;
         }
-        if (best === 0) return 0; // this token matched nothing -> drop result
-        total += best;
+        if (best > 0) {
+          matched += 1;
+          total += best;
+        }
       }
-      return total;
-    }
-
-    function queryTokens(query: string): string[] {
-      return query
-        .toLowerCase()
-        .split(/\s+/)
-        .map((t) => t.trim())
-        .filter(Boolean);
+      if (matched === 0) return 0; // nothing matched -> drop result
+      // soft-AND: matched-token weights are summed, then scaled by coverage (how
+      // much of the query hit). Partial matches are kept but damped rather than
+      // dropped (unlike a hard AND). Coverage biases toward — but does not dictate —
+      // order: a strong high-weight field hit can still outrank a low-weight full match.
+      const coverage = matched / tokens.length;
+      return total * (0.5 + 0.5 * coverage);
     }
 
     function search(query: string): SearchItem[] {
-      const tokens = queryTokens(query);
+      const tokens = tokenize(query);
       if (tokens.length === 0 || !index) return [];
       return index
-        .map((item) => ({ item, score: scoreItem(item, tokens) }))
+        .map((indexed) => ({ item: indexed.item, score: scoreItem(indexed, tokens) }))
         .filter((r) => r.score > 0)
         .sort((a, b) => {
           if (b.score !== a.score) return b.score - a.score;
@@ -299,7 +331,7 @@ const description = "在 LiLink 开发日志里搜索全部更新：按标题、
 
       const start = (safePage - 1) * PAGE_SIZE;
       const results = all.slice(start, start + PAGE_SIZE);
-      const tokens = queryTokens(query);
+      const tokens = tokenize(query);
 
       hint.hidden = true;
       list.hidden = false;

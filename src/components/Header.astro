@@ -25,6 +25,7 @@ const mainSite = "https://www.lilink.top";
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
         <span class="label">搜索</span>
+        <kbd class="shortcut" aria-hidden="true">/</kbd>
       </a>
       <a href="/tags">标签</a>
       <a href="/rss.xml">RSS</a>
@@ -98,9 +99,26 @@ const mainSite = "https://www.lilink.top";
     flex-shrink: 0;
   }
 
-  /* Drop the label on very narrow screens — keep just the icon. */
+  /* A faint "/" key hint so the site-wide shortcut is discoverable on desktop. */
+  .search-link .shortcut {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.15rem;
+    height: 1.15rem;
+    padding: 0 0.28rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 5px;
+    background: var(--color-canvas);
+    color: var(--color-text-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    line-height: 1;
+  }
+
+  /* Drop the label and key hint on very narrow screens — keep just the icon. */
   @media (max-width: 30rem) {
-    .search-link .label {
+    .search-link .label,
+    .search-link .shortcut {
       display: none;
     }
     .search-link {
