@@ -5,7 +5,7 @@ import AuthorByline from "../components/AuthorByline.astro";
 import TagList from "../components/TagList.astro";
 import { formatPublishedDate, formatWeekLabel, toIsoDate } from "../lib/dates";
 import { resolveAuthors } from "../lib/authors";
-import type { Post } from "../lib/posts";
+import { postPath, type Post } from "../lib/posts";
 import BaseLayout from "./BaseLayout.astro";
 
 interface Props {
@@ -16,7 +16,7 @@ const { post } = Astro.props;
 const { title, summary, publishedAt, authors, tags, cover, coverAlt } = post.data;
 
 const ogImage = `/og/${post.id}.png`;
-const url = new URL(`/posts/${post.id}`, Astro.site).href;
+const url = new URL(postPath(post), Astro.site).href;
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "BlogPosting",

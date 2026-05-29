@@ -11,7 +11,7 @@ import {
   formatWeekLabel,
   toIsoDate,
 } from "../lib/dates";
-import { getPublishedPosts, groupByWeek } from "../lib/posts";
+import { getPublishedPosts, groupByWeek, postPath } from "../lib/posts";
 
 const posts = await getPublishedPosts();
 const weeks = groupByWeek(posts);
@@ -159,7 +159,7 @@ const jsonLd = {
                       <span class="pager-link is-empty" aria-hidden="true" />
                     )}
                   </div>
-                  <a class="permalink" href={`/posts/${post.id}`}>
+                  <a class="permalink" href={postPath(post)}>
                     永久链接 ↗
                   </a>
                 </footer>

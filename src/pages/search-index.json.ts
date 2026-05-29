@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { toIsoDate } from "../lib/dates";
 import { resolveAuthors } from "../lib/authors";
 import { resolveTags } from "../lib/tags";
-import { getPublishedPosts } from "../lib/posts";
+import { getPublishedPosts, postPath } from "../lib/posts";
 
 /** One searchable record per published post. Kept small and plaintext. */
 interface SearchItem {
@@ -71,7 +71,7 @@ export const GET: APIRoute = async () => {
 
   const items: SearchItem[] = posts.map((post) => ({
     id: post.id,
-    url: "/posts/" + post.id,
+    url: postPath(post),
     title: post.data.title,
     summary: post.data.summary,
     date: toIsoDate(post.data.publishedAt),
