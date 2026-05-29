@@ -12,7 +12,11 @@ const posts = defineCollection({
       .object({
         title: z.string(),
         // Optional URL override. Defaults to the file id (filename minus `.mdx`).
-        slug: z.string().optional(),
+        // Kebab-case only — it becomes a URL path segment (no slashes/spaces).
+        slug: z
+          .string()
+          .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "slug 只能是小写字母、数字、连字符（会作为链接路径片段，不能含斜杠或空格）")
+          .optional(),
         // Publish date. Drives ordering and the weekly timeline grouping.
         publishedAt: z.coerce.date(),
         // Optional "last updated" date, shown when a post is revised after publishing.
