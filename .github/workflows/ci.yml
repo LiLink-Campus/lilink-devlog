@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20 # matches engines.node ">=20.3.0"
+          node-version: 22 # Astro 6 / @astrojs/mdx require Node >=22.12.0
           cache: npm
 
       - name: Install dependencies
