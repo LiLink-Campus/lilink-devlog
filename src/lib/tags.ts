@@ -8,8 +8,8 @@ export function getTag(id: string): Tag | undefined {
 }
 
 /** Resolve a list of tag ids to Tag records, silently dropping unknown ids. */
-export function resolveTags(ids: string[]): Tag[] {
-  return ids.map((id) => tags[id]).filter((t): t is Tag => Boolean(t));
+export function resolveTags(ids: string[] | undefined): Tag[] {
+  return (ids ?? []).map((id) => tags[id]).filter((t): t is Tag => Boolean(t));
 }
 
 /** Canonical URL for a tag's index page. */

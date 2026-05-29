@@ -52,7 +52,7 @@ export function groupByWeek(posts: Post[]): WeekGroup[] {
 /** Published posts carrying `tagId`, newest first. */
 export async function getPostsByTag(tagId: string): Promise<Post[]> {
   const posts = await getPublishedPosts();
-  return posts.filter((post) => post.data.tags.includes(tagId));
+  return posts.filter((post) => (post.data.tags ?? []).includes(tagId));
 }
 
 /**
@@ -63,7 +63,7 @@ export async function getAllTagsWithCounts(): Promise<{ tag: Tag; count: number 
   const posts = await getPublishedPosts();
   const counts = new Map<string, number>();
   for (const post of posts) {
-    for (const id of post.data.tags) {
+    for (const id of post.data.tags ?? []) {
       counts.set(id, (counts.get(id) ?? 0) + 1);
     }
   }
