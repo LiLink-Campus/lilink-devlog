@@ -148,8 +148,9 @@ function parseFrontmatter(raw) {
     return r ? r[1].trim() : undefined;
   };
   const title = (field("title") || "").replace(/^["']|["']$/g, "");
-  // `status` replaced the old `draft` boolean; default to "published" when absent.
-  const status = (field("status") || "published").replace(/^["']|["']$/g, "");
+  // `status` is required (content.config.ts / validate-content.mjs); only
+  // `published` posts get a card, so an absent status is treated as non-published.
+  const status = (field("status") || "").replace(/^["']|["']$/g, "");
   return { title, publishedAt: field("publishedAt"), status };
 }
 
