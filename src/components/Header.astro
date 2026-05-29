@@ -1,6 +1,5 @@
 ---
 import BrandMark from "./BrandMark.astro";
-import Search from "./Search.astro";
 
 const mainSite = "https://www.lilink.top";
 ---
@@ -9,13 +8,44 @@ const mainSite = "https://www.lilink.top";
   <div class="container inner">
     <BrandMark href="/" />
     <nav class="nav" aria-label="主导航">
-      <Search />
+      <a class="search-link" href="/search" aria-label="搜索">
+        <svg
+          class="icon"
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span class="label">搜索</span>
+      </a>
       <a href="/tags">标签</a>
       <a href="/rss.xml">RSS</a>
       <a class="back" href={mainSite}>回到 LiLink</a>
     </nav>
   </div>
 </header>
+
+<script>
+  // Preserve the site-wide "/" shortcut: jump to the search page when the user
+  // isn't already typing in a field.
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "/" || event.defaultPrevented) return;
+    const target = event.target as HTMLElement | null;
+    const tag = target?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+    if (window.location.pathname === "/search") return;
+    event.preventDefault();
+    window.location.href = "/search";
+  });
+</script>
 
 <style>
   .site-header {
@@ -49,6 +79,33 @@ const mainSite = "https://www.lilink.top";
 
   .nav a:hover {
     color: var(--color-brand);
+  }
+
+  .search-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border-strong);
+  }
+
+  .search-link:hover {
+    border-color: var(--color-brand);
+  }
+
+  .search-link .icon {
+    flex-shrink: 0;
+  }
+
+  /* Drop the label on very narrow screens — keep just the icon. */
+  @media (max-width: 30rem) {
+    .search-link .label {
+      display: none;
+    }
+    .search-link {
+      padding: 0.4rem 0.55rem;
+    }
   }
 
   .nav .back {

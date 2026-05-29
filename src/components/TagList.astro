@@ -2,12 +2,12 @@
 import { resolveTags, tagHref } from "../lib/tags";
 
 interface Props {
-  ids: string[];
+  ids?: string[];
   /** "sm" for inline meta lines, "md" for standalone listings (default). */
   size?: "sm" | "md";
 }
 
-const { ids, size = "md" } = Astro.props;
+const { ids = [], size = "md" } = Astro.props;
 const tags = resolveTags(ids);
 ---
 

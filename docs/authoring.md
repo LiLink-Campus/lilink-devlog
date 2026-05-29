@@ -236,7 +236,7 @@ npm run validate:build  # 加 --check-build，校验 dist/ 产物（一般交给
 
 - **标签总览 `/tags`**：列出所有出现在已发布文章里的标签及其文章数（`getAllTagsWithCounts`，按数量降序、再按名称排序）。
 - **单个标签 `/tags/<id>`**：列出该标签下的已发布文章（日期 + 标题 + 概述）。标签链接由 `tagHref(id)` 生成（即 `/tags/<id>`）。
-- **搜索**：Header 里的搜索是一个自包含的弹窗组件（`src/components/Search.astro`）。首次打开时懒加载 `/search-index.json`，在标题 / 概述 / 标签 / 作者 / 正文上做轻量模糊匹配，**无任何运行时第三方依赖**。
+- **搜索 `/search`**：独立的搜索页（`src/pages/search.astro`），大号搜索框 + 下方结果列表；Header 里的"搜索"链接跳到这里，全局按 `/` 也会跳转。进页时懒加载 `/search-index.json`，在标题 / 概述 / 标签 / 作者 / 正文上做轻量模糊匹配，**无任何运行时第三方依赖**。查询词同步到 URL（`/search?q=关键词`），可分享、刷新保留。
 - **搜索索引 `/search-index.json`**：由 `src/pages/search-index.json.ts` 基于 `getPublishedPosts()` 生成，所以**草稿 / 待审稿不会进索引**；正文会去掉 frontmatter / import / JSX 标签 / Markdown 标点后取约 2000 字纯文本。
 
 这些页面和索引都基于第 3 节的发布过滤，未发布的文章不会出现在任何对外入口。
