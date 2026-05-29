@@ -1,34 +1,19 @@
 ---
-import { Image } from "astro:assets";
-import { render } from "astro:content";
-import AuthorByline from "../components/AuthorByline.astro";
-import TagList from "../components/TagList.astro";
-import { mdxComponents } from "../components/mdx";
+import Entry from "../components/Entry.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import {
-  formatEntryDate,
-  formatPublishedDate,
-  formatWeekLabel,
-  toIsoDate,
-} from "../lib/dates";
-import { getPublishedPosts, groupByWeek, postPath } from "../lib/posts";
+import { formatEntryDate, toIsoDate } from "../lib/dates";
+import { getPublishedPosts, groupByWeek, postPath, postSlug } from "../lib/posts";
 
 const posts = await getPublishedPosts();
 const weeks = groupByWeek(posts);
 
 // The home page is the open book: a contents rail on the left, one entry's
-// page on the right. Every body is rendered up front; CSS (:target) decides
-// which page shows. Standalone /posts/[slug] pages still exist for RSS,
-// sharing and SEO.
-type Body = Awaited<ReturnType<typeof render>>["Content"];
-const bodies = new Map<string, Body>();
-for (const post of posts) {
-  const { Content } = await render(post);
-  bodies.set(post.id, Content);
-}
-
-// With no hash, the newest entry is the page shown by default.
-const newestId = posts[0]?.id;
+// page on the right. Only the newest entry is server-rendered; the rest are
+// fetched as fragments from /entries/<slug> on demand (see the script below),
+// so the DOM never holds more than one article body no matter how many posts
+// pile up. Standalone /posts/[slug] pages still exist for RSS, sharing, SEO
+// and as the no-JS fallback the contents links point at.
+const newest = posts[0];
 const entryCount = posts.length;
 const weekCount = weeks.length;
 
@@ -59,7 +44,7 @@ const jsonLd = {
       <p class="empty container">还没有更新，很快就来。</p>
     ) : (
       <div class="book container">
-        <nav class="toc" aria-label="目录">
+        <nav class="toc" aria-label="目录" data-toc>
           <div class="toc-head">
             <h1>LiLink 开发日志</h1>
             <p class="toc-lede">持续记录每一次迭代</p>
@@ -85,7 +70,9 @@ const jsonLd = {
                       <li>
                         <a
                           class:list={["toc-item", { featured: post.data.featured }]}
-                          href={`#${post.id}`}
+                          href={postPath(post)}
+                          data-slug={postSlug(post)}
+                          data-post-id={post.id}
                         >
                           <time datetime={toIsoDate(post.data.publishedAt)}>
                             {formatEntryDate(post.data.publishedAt)}
@@ -101,139 +88,189 @@ const jsonLd = {
           </details>
         </nav>
 
-        <div class="reader">
-          {posts.map((post, i) => {
-            const Content = bodies.get(post.id)!;
-            const { title, summary, publishedAt, authors, tags, cover, coverAlt } = post.data;
-            const newer = posts[i - 1]; // 时间上更新的一条（数组为最新在前）
-            const older = posts[i + 1]; // 时间上更早的一条
-            return (
-              <article
-                class="page"
-                id={post.id}
-                data-default={post.id === newestId ? "" : undefined}
-              >
-                <header class="page-head">
-                  <p class="page-meta">
-                    <time datetime={toIsoDate(publishedAt)}>
-                      {formatPublishedDate(publishedAt)}
-                    </time>
-                    <span class="dot" aria-hidden="true">·</span>
-                    <span class="week">{formatWeekLabel(publishedAt)}</span>
-                    <span class="dot" aria-hidden="true">·</span>
-                    <span class="by"><AuthorByline ids={authors} /></span>
-                  </p>
-                  <h2>{title}</h2>
-                  <p class="page-summary">{summary}</p>
-                  <div class="page-tags">
-                    <TagList ids={tags} size="sm" />
-                  </div>
-                </header>
-                {cover ? (
-                  <Image
-                    class="page-cover"
-                    src={cover}
-                    alt={coverAlt ?? title}
-                    widths={[480, 960]}
-                  />
-                ) : null}
-                <div class="prose">
-                  <Content components={mdxComponents} />
-                </div>
-                <footer class="page-foot">
-                  <div class="pager">
-                    {newer ? (
-                      <a class="pager-link prev" href={`#${newer.id}`}>
-                        <span class="pager-dir">← 更新的一条</span>
-                        <span class="pager-title">{newer.data.title}</span>
-                      </a>
-                    ) : (
-                      <span class="pager-link is-empty" aria-hidden="true" />
-                    )}
-                    {older ? (
-                      <a class="pager-link next" href={`#${older.id}`}>
-                        <span class="pager-dir">更早的一条 →</span>
-                        <span class="pager-title">{older.data.title}</span>
-                      </a>
-                    ) : (
-                      <span class="pager-link is-empty" aria-hidden="true" />
-                    )}
-                  </div>
-                  <a class="permalink" href={postPath(post)}>
-                    永久链接 ↗
-                  </a>
-                </footer>
-              </article>
-            );
-          })}
+        <div class="reader" data-reader aria-live="polite" aria-atomic="true">
+          <Entry post={newest} older={posts[1]} />
         </div>
       </div>
     )
   }
 </BaseLayout>
 
-<script is:inline>
-  // Show/hide is pure CSS (:target). JS only enhances:
-  //   · highlight the active contents item and keep it scrolled into view
-  //   · arrow-key paging between adjacent entries
-  //   · collapse the contents on narrow screens (ships open, so it degrades)
-  (function () {
-    var pages = Array.prototype.slice.call(document.querySelectorAll(".page"));
+<script>
+  import { mountVideoFacades } from "../scripts/mount-video-facades";
 
-    function activePage() {
-      var id = decodeURIComponent(location.hash.slice(1));
-      var el = id && document.getElementById(id);
-      if (!el || el.className.indexOf("page") === -1) {
-        el = document.querySelector(".page[data-default]");
-      }
-      return el;
+  // The reader shows one entry at a time. The newest is server-rendered; every
+  // other entry is fetched as a fragment from /entries/<slug> the first time
+  // it's opened and cached, so the DOM never holds more than one article body.
+  //
+  // The contents + pager links carry both a real permalink href (so the page
+  // degrades to a normal multi-page site without JS) and a data-slug we use to
+  // swap entries in place. The active entry is mirrored into the URL hash so a
+  // refresh keeps the book open on the same page.
+  const readerEl = document.querySelector<HTMLElement>("[data-reader]");
+  const tocEl = document.querySelector<HTMLElement>("[data-toc]");
+
+  if (readerEl && tocEl) {
+    const reader = readerEl;
+    const toc = tocEl;
+
+    const tocItems = Array.from(
+      toc.querySelectorAll<HTMLAnchorElement>(".toc-item[data-slug]"),
+    );
+
+    // Slug order, newest-first — drives keyboard paging and neighbour lookup.
+    const order = tocItems.map((a) => a.dataset.slug ?? "").filter(Boolean);
+
+    // Legacy deep links used collection entry ids in the hash (#post.id).
+    const idToSlug = new Map<string, string>();
+    for (const a of tocItems) {
+      const slug = a.dataset.slug;
+      const id = a.dataset.postId;
+      if (slug && id) idToSlug.set(id, slug);
     }
 
-    function syncActive() {
-      var active = activePage();
-      var href = active ? "#" + active.id : null;
-      document.querySelectorAll(".toc-item").forEach(function (a) {
-        var on = a.getAttribute("href") === href;
+    const cache = new Map<string, string>();
+    let current = reader.querySelector<HTMLElement>(".page")?.dataset.slug ?? order[0];
+    let showToken = 0;
+    const siteName = document.title;
+
+    function postFallbackUrl(slug: string): string {
+      return `/posts/${slug}`;
+    }
+
+    function syncDocumentTitle(): void {
+      const title = reader.querySelector(".page-head h2")?.textContent?.trim();
+      document.title = title ? `${title} · ${siteName}` : siteName;
+    }
+
+    function resolveSlug(hash: string): string | null {
+      if (!hash) return order[0] ?? null;
+      if (order.includes(hash)) return hash;
+      const mapped = idToSlug.get(hash);
+      if (mapped && order.includes(mapped)) return mapped;
+      return null;
+    }
+
+    function setActive(slug: string): void {
+      toc.querySelectorAll<HTMLElement>(".toc-item").forEach((a) => {
+        const on = a.dataset.slug === slug;
         a.classList.toggle("is-active", on);
         if (on) a.scrollIntoView({ block: "nearest" });
       });
     }
 
-    // ← / → jump to the newer / older entry (array is newest-first).
-    function onKey(e) {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      var t = e.target;
-      if (
-        t &&
-        (t.isContentEditable ||
-          /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""))
-      )
-        return;
-      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      var i = pages.indexOf(activePage());
-      if (i === -1) return;
-      var to = e.key === "ArrowLeft" ? pages[i - 1] : pages[i + 1];
-      if (to) {
-        e.preventDefault();
-        location.hash = "#" + to.id;
+    async function fetchFragment(slug: string): Promise<string | null> {
+      const cached = cache.get(slug);
+      if (cached !== undefined) return cached;
+      try {
+        const res = await fetch(`/entries/${slug}`);
+        if (!res.ok) return null;
+        const html = await res.text();
+        if (!html.trim()) return null;
+        cache.set(slug, html);
+        return html;
+      } catch {
+        return null;
       }
     }
 
-    // The <details> ships `open`; collapse it only on narrow screens.
-    var details = document.querySelector(".toc-nav");
-    var mql = window.matchMedia("(max-width: 820px)");
-    function syncCollapse(e) {
-      if (details) details.open = !e.matches;
+    async function show(rawSlug: string, push = true): Promise<void> {
+      const slug = resolveSlug(rawSlug);
+      if (!slug || !order.includes(slug)) return;
+
+      const token = ++showToken;
+      reader.setAttribute("aria-busy", "true");
+
+      try {
+        if (slug !== current) {
+          const html = await fetchFragment(slug);
+          if (token !== showToken) return;
+          if (!html) {
+            window.location.href = postFallbackUrl(slug);
+            return;
+          }
+
+          reader.innerHTML = html;
+          mountVideoFacades(reader);
+          document.dispatchEvent(new Event("astro:page-load"));
+          current = slug;
+        }
+
+        if (token !== showToken) return;
+
+        setActive(current);
+        syncDocumentTitle();
+        if (push) {
+          history.pushState({ slug: current }, "", `#${current}`);
+        } else if (rawSlug !== current) {
+          // Normalize legacy #post.id hashes to the canonical slug.
+          history.replaceState({ slug: current }, "", `#${current}`);
+        }
+        reader.querySelector(".page")?.scrollIntoView({ block: "start" });
+      } finally {
+        if (token === showToken) reader.removeAttribute("aria-busy");
+      }
     }
+
+    mountVideoFacades(reader);
+
+    // Intercept clicks on any in-book link carrying data-slug (contents + pagers).
+    document.addEventListener("click", (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (event.button !== 0) return;
+      const link = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[data-slug]");
+      const slug = link?.dataset.slug;
+      if (!slug || !order.includes(slug)) return; // unknown → let the browser navigate
+      event.preventDefault();
+      void show(slug);
+    });
+
+    // ← / → page to the newer / older entry (array is newest-first).
+    window.addEventListener("keydown", (event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+      )
+        return;
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      const i = order.indexOf(current);
+      if (i === -1) return;
+      const to = event.key === "ArrowLeft" ? order[i - 1] : order[i + 1];
+      if (to) {
+        event.preventDefault();
+        void show(to);
+      }
+    });
+
+    window.addEventListener("popstate", () => {
+      const hash = decodeURIComponent(window.location.hash.slice(1));
+      const slug = resolveSlug(hash) ?? order[0];
+      if (slug) void show(slug, false);
+    });
+
+    // The <details> ships `open`; collapse it only on narrow screens.
+    const details = document.querySelector<HTMLDetailsElement>(".toc-nav");
+    const mql = window.matchMedia("(max-width: 820px)");
+    const syncCollapse = (e: MediaQueryList | MediaQueryListEvent) => {
+      if (details) details.open = !e.matches;
+    };
     if (details) {
       syncCollapse(mql);
       mql.addEventListener("change", syncCollapse);
     }
 
-    addEventListener("hashchange", syncActive);
-    addEventListener("keydown", onKey);
-    syncActive();
-  })();
+    // Deep link: open the entry named in the URL hash on load.
+    const initialHash = decodeURIComponent(window.location.hash.slice(1));
+    const initial = initialHash ? resolveSlug(initialHash) : null;
+    if (initial && initial !== current) {
+      void show(initial, false);
+    } else {
+      setActive(current);
+      syncDocumentTitle();
+    }
+  }
 </script>
 
 <style>
@@ -384,163 +421,10 @@ const jsonLd = {
     color: var(--color-brand);
   }
 
-  /* Right page — one entry at a time, chosen by the URL fragment */
+  /* Right page — a single entry, swapped in place by the reader script.
+     The entry's own styling lives in Entry.astro (shared with the fragments). */
   .reader {
     min-width: 0;
-  }
-
-  .page {
-    display: none;
-    max-width: var(--measure);
-    scroll-margin-top: 4.75rem;
-  }
-
-  .page:target {
-    display: block;
-  }
-
-  /* No (or unknown) hash → show the newest entry. */
-  .reader:not(:has(.page:target)) .page[data-default] {
-    display: block;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .page:target,
-    .reader:not(:has(.page:target)) .page[data-default] {
-      animation: turn 0.24s ease;
-    }
-  }
-
-  @keyframes turn {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .page-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: 0.82rem;
-    color: var(--color-text-muted);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .page-meta .dot {
-    color: var(--color-border-strong);
-  }
-
-  .page-head h2 {
-    margin: var(--space-3) 0 var(--space-4);
-    font-size: clamp(1.75rem, 3.5vw, 2.25rem);
-    text-wrap: balance;
-  }
-
-  .page-head .page-summary {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 1.15rem;
-    line-height: 1.6;
-    color: var(--color-text-secondary);
-    text-wrap: pretty;
-  }
-
-  /* Subtle tag chips under the summary; collapses when the entry has no tags. */
-  .page-tags {
-    margin-top: var(--space-3);
-  }
-
-  .page-tags:empty {
-    margin-top: 0;
-  }
-
-  .page-cover {
-    width: 100%;
-    height: auto;
-    margin-top: var(--space-6);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
-  }
-
-  .prose {
-    margin-top: var(--space-6);
-  }
-
-  /* Foot — prev/next pager + permalink */
-  .page-foot {
-    margin-top: var(--space-7);
-    padding-top: var(--space-5);
-    border-top: 1px solid var(--color-border);
-  }
-
-  .pager {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
-  }
-
-  .pager-link {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    transition:
-      border-color 0.15s ease,
-      background 0.15s ease;
-  }
-
-  a.pager-link:hover {
-    border-color: var(--color-brand);
-    background: var(--color-surface-tinted);
-  }
-
-  .pager-link.next {
-    text-align: right;
-  }
-
-  .pager-link.is-empty {
-    border: none;
-    background: none;
-  }
-
-  .pager-dir {
-    font-size: 0.76rem;
-    color: var(--color-text-muted);
-  }
-
-  a.pager-link:hover .pager-dir {
-    color: var(--color-brand);
-  }
-
-  .pager-title {
-    font-size: 0.9rem;
-    line-height: 1.35;
-    color: var(--color-text-secondary);
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-    overflow: hidden;
-  }
-
-  .page-foot .permalink {
-    display: inline-block;
-    margin-top: var(--space-4);
-    font-size: 0.82rem;
-    color: var(--color-text-muted);
-    transition: color 0.15s ease;
-  }
-
-  .page-foot .permalink:hover {
-    color: var(--color-brand);
   }
 
   /* Narrow screens: the contents collapse above the page */
@@ -589,18 +473,6 @@ const jsonLd = {
 
     .toc-weeks {
       margin-top: var(--space-4);
-    }
-
-    .page {
-      max-width: none;
-    }
-
-    .pager {
-      grid-template-columns: 1fr;
-    }
-
-    .pager-link.is-empty {
-      display: none;
     }
   }
 </style>

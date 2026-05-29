@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /entries/
 
 Sitemap: https://devlog.lilink.top/sitemap-index.xml

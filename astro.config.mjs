@@ -11,7 +11,11 @@ const site = process.env.DEVLOG_SITE_URL || "https://devlog.lilink.top";
 export default defineConfig({
   site,
   trailingSlash: "never",
-  integrations: [mdx(), sitemap()],
+  integrations: [
+    mdx(),
+    // /entries/* are fetch-only HTML fragments (also disallowed in robots.txt).
+    sitemap({ filter: (page) => !page.includes("/entries/") }),
+  ],
   build: {
     format: "directory",
   },

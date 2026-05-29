@@ -1,0 +1,186 @@
+/*
+ * Rich-media styles for MDX bodies (<Figure>, <Gallery>, <Video>).
+ *
+ * These live in a GLOBAL sheet — not in each component's scoped <style> — so an
+ * article body can be fetched as a fragment and injected into the home "book"
+ * reader without dragging its per-page scoped CSS along. The home page always
+ * loads this sheet, so any injected media is styled regardless of which post
+ * happened to be server-rendered first.
+ */
+
+/* --- Figure --------------------------------------------------------------- */
+.figure {
+  margin: var(--space-6) 0;
+}
+
+.figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.figure figcaption {
+  margin-top: var(--space-2);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+/* --- Gallery -------------------------------------------------------------- */
+.gallery {
+  /* auto-fit + minmax means it naturally drops to fewer columns (down to 1)
+     as the container narrows, while never exceeding --cols on wide screens. */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: var(--space-4);
+  margin: var(--space-6) 0;
+}
+
+/* The figures inside a gallery shed their own outer margin — the grid gap
+   owns the spacing now. */
+.gallery .figure {
+  margin: 0;
+}
+
+/* On comfortably wide viewports, honour the author's requested column count. */
+@media (min-width: 48rem) {
+  .gallery {
+    grid-template-columns: repeat(var(--cols), 1fr);
+  }
+}
+
+/* --- Video ---------------------------------------------------------------- */
+.video {
+  margin: var(--space-6) 0;
+}
+
+/* Shared 16:9 frame for the <video>, the facade button and the swapped-in
+   iframe — so there's no layout shift when the iframe replaces the button. */
+.video .player,
+.video .facade {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.video .player {
+  background: var(--color-text);
+}
+
+/* iframe injected by the script inherits .player but needs a border reset. */
+.video iframe.player {
+  border: 1px solid var(--color-border);
+}
+
+.video .facade {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  color: var(--color-text-on-brand);
+  background:
+    var(--poster, none) center / cover no-repeat,
+    linear-gradient(135deg, var(--color-brand-ink), var(--color-brand));
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+/* Scrim so the title/host stay legible over any poster. */
+.video .facade::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(var(--color-text-rgb), 0.55),
+    rgba(var(--color-text-rgb), 0.05) 55%,
+    transparent
+  );
+}
+
+.video .facade:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.video .facade:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.video .play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  border-radius: var(--radius-pill);
+  background: rgba(var(--color-canvas-rgb), 0.16);
+  backdrop-filter: blur(2px);
+  border: 1px solid rgba(var(--color-canvas-rgb), 0.5);
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.video .play svg {
+  margin-left: 3px; /* optically centre the triangle */
+}
+
+.video .facade:hover .play {
+  background: var(--color-brand);
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+.video .facade-meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+}
+
+.video .facade-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.video .facade-host {
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+.video figcaption {
+  margin-top: var(--space-2);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video .facade,
+  .video .play,
+  .video .facade:hover .play {
+    transition: none;
+  }
+}
