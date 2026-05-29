@@ -177,12 +177,16 @@
       return total;
     }
 
-    function search(query: string): SearchItem[] {
-      const tokens = query
+    function queryTokens(query: string): string[] {
+      return query
         .toLowerCase()
         .split(/\s+/)
         .map((t) => t.trim())
         .filter(Boolean);
+    }
+
+    function search(query: string): SearchItem[] {
+      const tokens = queryTokens(query);
       if (tokens.length === 0 || !index) return [];
       return index
         .map((item) => ({ item, score: scoreItem(item, tokens) }))
@@ -205,6 +209,50 @@
         .replace(/"/g, "&quot;");
     }
 
+    function escapeRegExp(value: string): string {
+      return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    // Escape `text`, wrapping case-insensitive matches of any query token in
+    // <mark>. Operates on the raw text so escaping and marking never collide.
+    function highlight(text: string, tokens: string[]): string {
+      if (!text) return "";
+      const terms = tokens.filter(Boolean);
+      if (terms.length === 0) return escapeHtml(text);
+      const re = new RegExp("(" + terms.map(escapeRegExp).join("|") + ")", "gi");
+      let out = "";
+      let last = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        out += escapeHtml(text.slice(last, m.index));
+        out += "<mark>" + escapeHtml(m[0]) + "</mark>";
+        last = m.index + m[0].length;
+        if (m.index === re.lastIndex) re.lastIndex++; // guard zero-length matches
+      }
+      out += escapeHtml(text.slice(last));
+      return out;
+    }
+
+    // A short context snippet around the first body hit (term highlighted);
+    // falls back to the summary when the match was only in the title/tags.
+    function makeSnippet(item: SearchItem, tokens: string[]): string {
+      const body = item.body || "";
+      const lower = body.toLowerCase();
+      let hit = -1;
+      for (const t of tokens) {
+        const i = lower.indexOf(t);
+        if (i !== -1 && (hit === -1 || i < hit)) hit = i;
+      }
+      if (hit === -1) return highlight(item.summary || "", tokens);
+      const RADIUS = 56;
+      const start = Math.max(0, hit - RADIUS);
+      const end = Math.min(body.length, hit + RADIUS * 2);
+      const slice = body.slice(start, end).trim();
+      const prefix = start > 0 ? "… " : "";
+      const suffix = end < body.length ? " …" : "";
+      return prefix + highlight(slice, tokens) + suffix;
+    }
+
     function render(query: string): void {
       if (!query.trim()) {
         list.hidden = true;
@@ -221,16 +269,19 @@
         hint.textContent = `没有找到与「${query.trim()}」相关的更新。`;
         return;
       }
+      const tokens = queryTokens(query);
       hint.hidden = true;
       list.hidden = false;
       list.innerHTML = results
         .map((item) => {
+          const titleHtml = highlight(item.title, tokens);
+          const snippetHtml = makeSnippet(item, tokens);
           const meta = [item.date, ...item.tags].map(escapeHtml).join(" · ");
           return `
             <li class="search-item">
               <a href="${escapeHtml(item.url)}">
-                <span class="search-item-title">${escapeHtml(item.title)}</span>
-                <span class="search-item-summary">${escapeHtml(item.summary)}</span>
+                <span class="search-item-title">${titleHtml}</span>
+                ${snippetHtml ? `<span class="search-item-snippet">${snippetHtml}</span>` : ""}
                 <span class="search-item-meta">${meta}</span>
               </a>
             </li>`;
@@ -463,10 +514,14 @@
 
   .search-item-title {
     font-family: var(--font-display);
-    font-size: 1.02rem;
+    font-size: 1.05rem;
     font-weight: 600;
-    line-height: 1.35;
-    text-wrap: balance;
+    line-height: 1.3;
+    color: var(--color-brand-ink);
+    /* one clean line per result so a long list stays scannable */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .search-item a:hover .search-item-title,
@@ -474,10 +529,10 @@
     color: var(--color-brand);
   }
 
-  .search-item-summary {
+  .search-item-snippet {
     color: var(--color-text-secondary);
-    font-size: 0.88rem;
-    line-height: 1.5;
+    font-size: 0.85rem;
+    line-height: 1.55;
     text-wrap: pretty;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -486,10 +541,20 @@
   }
 
   .search-item-meta {
+    margin-top: 0.1rem;
     color: var(--color-text-muted);
-    font-size: 0.76rem;
+    font-size: 0.74rem;
     letter-spacing: 0.01em;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Matched query terms — warm wine tint, never the browser's default yellow. */
+  .search-item mark {
+    background: var(--color-brand-soft);
+    color: var(--color-brand-ink);
+    border-radius: 3px;
+    padding: 0 0.14em;
+    font-weight: 600;
   }
 
   /* Hide the trigger label on very narrow screens — keep just the icon. */
