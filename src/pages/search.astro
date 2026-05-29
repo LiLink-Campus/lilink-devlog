@@ -7,9 +7,10 @@
  * same dependency-free weighted fuzzy match used elsewhere
  * (title > tags > authors > summary > body).
  *
- * The query is synced to the URL as ?q=…: on load the page reads it, fills the
- * input and renders; typing updates the URL via history.replaceState so the
- * search is shareable and survives a refresh.
+ * The query is synced to the URL as ?q=…&page=…: on load the page reads it,
+ * fills the input and renders; typing updates the URL via history.replaceState
+ * so the search is shareable and survives a refresh. Results paginate at 24
+ * per page.
  */
 import BaseLayout from "../layouts/BaseLayout.astro";
 
@@ -56,6 +57,7 @@ const description = "在 LiLink 开发日志里搜索全部更新：按标题、
     <div class="search-results" data-search-results aria-live="polite">
       <p class="search-hint" data-search-hint hidden></p>
       <ul class="search-list" data-search-list hidden></ul>
+      <nav class="search-pagination" data-search-pagination hidden aria-label="搜索结果分页"></nav>
     </div>
   </div>
 </BaseLayout>
@@ -76,15 +78,18 @@ const description = "在 LiLink 开发日志里搜索全部更新：按标题、
   const inputEl = document.querySelector<HTMLInputElement>("[data-search-input]");
   const listEl = document.querySelector<HTMLUListElement>("[data-search-list]");
   const hintEl = document.querySelector<HTMLParagraphElement>("[data-search-hint]");
+  const paginationEl = document.querySelector<HTMLElement>("[data-search-pagination]");
 
-  if (formEl && inputEl && listEl && hintEl) {
+  if (formEl && inputEl && listEl && hintEl && paginationEl) {
     const form = formEl;
     const input = inputEl;
     const list = listEl;
     const hint = hintEl;
+    const pagination = paginationEl;
 
-    const MAX_RESULTS = 24;
+    const PAGE_SIZE = 24;
     const QUERY_PARAM = "q";
+    const PAGE_PARAM = "page";
     let index: SearchItem[] | null = null;
     let loading: Promise<SearchItem[]> | null = null;
 
@@ -168,7 +173,6 @@ const description = "在 LiLink 开发日志里搜索全部更新：按标题、
           // Tiebreak: newer first (ISO dates sort lexicographically).
           return a.item.date < b.item.date ? 1 : -1;
         })
-        .slice(0, MAX_RESULTS)
         .map((r) => r.item);
     }
 
@@ -225,39 +229,82 @@ const description = "在 LiLink 开发日志里搜索全部更新：按标题、
       return prefix + highlight(slice, tokens) + suffix;
     }
 
-    function render(query: string): void {
+    function renderItem(item: SearchItem, tokens: string[]): string {
+      const titleHtml = highlight(item.title, tokens);
+      const snippetHtml = makeSnippet(item, tokens);
+      const meta = [item.date, ...item.tags].map(escapeHtml).join(" · ");
+      return `
+        <li class="search-item">
+          <a href="${escapeHtml(item.url)}">
+            <span class="search-item-title">${titleHtml}</span>
+            ${snippetHtml ? `<span class="search-item-snippet">${snippetHtml}</span>` : ""}
+            <span class="search-item-meta">${meta}</span>
+          </a>
+        </li>`;
+    }
+
+    function renderPagination(total: number, page: number, totalPages: number): void {
+      if (totalPages <= 1) {
+        pagination.hidden = true;
+        pagination.innerHTML = "";
+        return;
+      }
+
+      const prevPage = page > 1 ? page - 1 : null;
+      const nextPage = page < totalPages ? page + 1 : null;
+      pagination.hidden = false;
+      pagination.innerHTML = `
+        <p class="search-page-status">共 ${total} 条 · 第 ${page} / ${totalPages} 页</p>
+        <div class="search-page-nav">
+          <button
+            type="button"
+            class="page-btn"
+            data-page="${prevPage ?? page}"
+            ${prevPage ? "" : "disabled"}
+          >上一页</button>
+          <button
+            type="button"
+            class="page-btn"
+            data-page="${nextPage ?? page}"
+            ${nextPage ? "" : "disabled"}
+          >下一页</button>
+        </div>`;
+    }
+
+    function render(query: string, page = 1): void {
+      pagination.hidden = true;
+      pagination.innerHTML = "";
+
       if (!query.trim()) {
         list.hidden = true;
         list.innerHTML = "";
         hint.hidden = true;
         return;
       }
-      const results = search(query);
-      if (results.length === 0) {
+
+      const all = search(query);
+      if (all.length === 0) {
         list.hidden = true;
         list.innerHTML = "";
         hint.hidden = false;
         hint.textContent = `没有找到与「${query.trim()}」相关的更新。`;
         return;
       }
+
+      const totalPages = Math.ceil(all.length / PAGE_SIZE);
+      const safePage = Math.min(Math.max(1, page), totalPages);
+      if (safePage !== page) {
+        writeQueryToUrl(query, safePage);
+      }
+
+      const start = (safePage - 1) * PAGE_SIZE;
+      const results = all.slice(start, start + PAGE_SIZE);
       const tokens = queryTokens(query);
+
       hint.hidden = true;
       list.hidden = false;
-      list.innerHTML = results
-        .map((item) => {
-          const titleHtml = highlight(item.title, tokens);
-          const snippetHtml = makeSnippet(item, tokens);
-          const meta = [item.date, ...item.tags].map(escapeHtml).join(" · ");
-          return `
-            <li class="search-item">
-              <a href="${escapeHtml(item.url)}">
-                <span class="search-item-title">${titleHtml}</span>
-                ${snippetHtml ? `<span class="search-item-snippet">${snippetHtml}</span>` : ""}
-                <span class="search-item-meta">${meta}</span>
-              </a>
-            </li>`;
-        })
-        .join("");
+      list.innerHTML = results.map((item) => renderItem(item, tokens)).join("");
+      renderPagination(all.length, safePage, totalPages);
     }
 
     // --- url sync -----------------------------------------------------------
@@ -265,28 +312,56 @@ const description = "在 LiLink 开发日志里搜索全部更新：按标题、
       return new URLSearchParams(window.location.search).get(QUERY_PARAM) ?? "";
     }
 
-    // Reflect the current query into ?q= without growing history; drop the
-    // param entirely when the box is empty so /search stays the clean URL.
-    function writeQueryToUrl(query: string): void {
+    function readPageFromUrl(): number {
+      const raw = new URLSearchParams(window.location.search).get(PAGE_PARAM);
+      const page = raw ? Number.parseInt(raw, 10) : 1;
+      return Number.isFinite(page) && page >= 1 ? page : 1;
+    }
+
+    // Reflect the current query (and page when > 1) into the URL without
+    // growing history; drop params when the box is empty so /search stays clean.
+    function writeQueryToUrl(query: string, page = 1): void {
       const url = new URL(window.location.href);
       if (query.trim()) {
         url.searchParams.set(QUERY_PARAM, query);
+        if (page > 1) {
+          url.searchParams.set(PAGE_PARAM, String(page));
+        } else {
+          url.searchParams.delete(PAGE_PARAM);
+        }
       } else {
         url.searchParams.delete(QUERY_PARAM);
+        url.searchParams.delete(PAGE_PARAM);
       }
       window.history.replaceState(null, "", url);
     }
 
     // --- wiring -------------------------------------------------------------
-    const initial = readQueryFromUrl();
-    if (initial) input.value = initial;
-    render(input.value);
+    const initialQuery = readQueryFromUrl();
+    const initialPage = readPageFromUrl();
+    if (initialQuery) input.value = initialQuery;
+    render(input.value, initialPage);
 
-    void loadIndex().then(() => render(input.value));
+    void loadIndex().then(() => render(input.value, readPageFromUrl()));
 
     input.addEventListener("input", () => {
-      writeQueryToUrl(input.value);
-      render(input.value);
+      writeQueryToUrl(input.value, 1);
+      render(input.value, 1);
+    });
+
+    pagination.addEventListener("click", (event) => {
+      const target = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-page]");
+      if (!target || target.disabled) return;
+      const page = Number.parseInt(target.dataset.page ?? "1", 10);
+      if (!Number.isFinite(page) || page < 1) return;
+      writeQueryToUrl(input.value, page);
+      render(input.value, page);
+      list.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    window.addEventListener("popstate", () => {
+      input.value = readQueryFromUrl();
+      render(input.value, readPageFromUrl());
     });
 
     // Enter navigates to the first result, matching typical search UX.
@@ -405,6 +480,48 @@ const description = "在 LiLink 开发日志里搜索全部更新：按标题、
 
   .search-list[hidden] {
     display: none;
+  }
+
+  .search-pagination[hidden] {
+    display: none;
+  }
+
+  .search-results :global(.search-page-status) {
+    margin: var(--space-4) var(--space-2) var(--space-3);
+    color: var(--color-text-muted);
+    font-size: 0.88rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .search-results :global(.search-page-nav) {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: 0 var(--space-2) var(--space-2);
+  }
+
+  .search-results :global(.page-btn) {
+    padding: 0.45rem 1rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .search-results :global(.page-btn:hover:not(:disabled)) {
+    color: var(--color-brand);
+    border-color: var(--color-brand);
+  }
+
+  .search-results :global(.page-btn:disabled) {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   /*
