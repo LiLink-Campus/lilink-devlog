@@ -11,7 +11,9 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "og:image": "node scripts/generate-og.mjs"
+    "og:image": "node scripts/generate-og.mjs",
+    "validate": "node scripts/validate-content.mjs",
+    "validate:build": "node scripts/validate-content.mjs --check-build"
   },
   "dependencies": {
     "@astrojs/mdx": "^5.0.6",

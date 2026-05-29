@@ -1,0 +1,163 @@
+---
+/**
+ * AuthorBlock — 文章末尾的「关于作者」卡片，每位作者一张。
+ * resolveAuthors 解析 id，未知 id 静默丢弃；无可解析作者则不渲染。
+ * 暖色书卷调，全部走 tokens；展示名字、角色、简介与外链。
+ */
+import { resolveAuthors, type Author } from "../lib/authors";
+
+interface Props {
+  ids: string[];
+}
+
+const { ids } = Astro.props;
+const resolved: Author[] = resolveAuthors(ids);
+
+/** 取名字首字符作为无头像时的占位字（中英文皆可）。 */
+function initial(author: Author): string {
+  return [...author.name][0] ?? "·";
+}
+---
+
+{
+  resolved.length > 0 ? (
+    <aside class="author-block" aria-label="关于作者">
+      {resolved.map((author) => (
+        <article class="author">
+          <div class="avatar" aria-hidden="true">
+            {author.avatar ? (
+              <img src={author.avatar} alt="" loading="lazy" decoding="async" />
+            ) : (
+              <span class="initial">{initial(author)}</span>
+            )}
+          </div>
+          <div class="body">
+            <p class="head">
+              <span class="name">{author.name}</span>
+              {author.role ? <span class="role">{author.role}</span> : null}
+            </p>
+            {author.bio ? <p class="bio">{author.bio}</p> : null}
+            {author.links && author.links.length > 0 ? (
+              <p class="links">
+                {author.links.map((link) => (
+                  <a
+                    class="link"
+                    href={link.href}
+                    rel="noopener noreferrer"
+                    target={link.href.startsWith("http") ? "_blank" : undefined}
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </p>
+            ) : null}
+          </div>
+        </article>
+      ))}
+    </aside>
+  ) : null
+}
+
+<style>
+  .author-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-top: var(--space-7);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .author {
+    display: flex;
+    gap: var(--space-4);
+    padding: var(--space-5);
+    background: var(--color-surface-tinted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .avatar {
+    flex-shrink: 0;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-brand) 100%);
+    color: var(--color-text-on-brand);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+
+  .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .initial {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .body {
+    min-width: 0;
+  }
+
+  .head {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .name {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--color-text);
+    line-height: 1.2;
+  }
+
+  .role {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bio {
+    margin: var(--space-2) 0 0;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    text-wrap: pretty;
+  }
+
+  .links {
+    margin: var(--space-3) 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .link {
+    font-size: 0.82rem;
+    padding: 0.25rem 0.7rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-text-secondary);
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .link:hover {
+    color: var(--color-brand);
+    border-color: var(--color-brand);
+  }
+</style>

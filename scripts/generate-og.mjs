@@ -148,7 +148,9 @@ function parseFrontmatter(raw) {
     return r ? r[1].trim() : undefined;
   };
   const title = (field("title") || "").replace(/^["']|["']$/g, "");
-  return { title, publishedAt: field("publishedAt"), draft: field("draft") === "true" };
+  // `status` replaced the old `draft` boolean; default to "published" when absent.
+  const status = (field("status") || "published").replace(/^["']|["']$/g, "");
+  return { title, publishedAt: field("publishedAt"), status };
 }
 
 function cnDate(iso) {
@@ -168,7 +170,7 @@ const files = (await fs.readdir(postsDir)).filter(
 let count = 0;
 for (const file of files.sort()) {
   const data = parseFrontmatter(await fs.readFile(path.join(postsDir, file), "utf8"));
-  if (!data || data.draft || !data.title) continue;
+  if (!data || data.status !== "published" || !data.title) continue;
   const slug = file.replace(/\.mdx$/, "");
   await render(
     postCard({ title: data.title, dateLabel: cnDate(data.publishedAt) }),

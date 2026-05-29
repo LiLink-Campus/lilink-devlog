@@ -1,5 +1,6 @@
 ---
 import { render } from "astro:content";
+import { mdxComponents } from "../../components/mdx";
 import PostLayout from "../../layouts/PostLayout.astro";
 import { getPublishedPosts } from "../../lib/posts";
 
@@ -16,5 +17,5 @@ const { Content } = await render(post);
 ---
 
 <PostLayout post={post}>
-  <Content />
+  <Content components={mdxComponents} />
 </PostLayout>

@@ -1,0 +1,60 @@
+---
+// A responsive grid of captioned images. Each item renders as a <Figure>,
+// so alt text is enforced per item by the Figure Props type.
+// `columns` is the target column count on wide screens (default 2); the grid
+// collapses to a single column on narrow screens via auto-fit + minmax.
+import Figure from "./Figure.astro";
+
+interface Props {
+  items: { src: string; alt: string; caption?: string; width?: number; height?: number }[];
+  columns?: number;
+}
+
+const { items, columns = 2 } = Astro.props;
+
+// Clamp to a sane range so a stray value can't blow up the layout.
+const cols = Math.min(Math.max(Math.round(columns), 1), 4);
+---
+
+{
+  items.length > 0 ? (
+    <div class="gallery" style={`--cols:${cols}`}>
+      {items.map((item) => (
+        <Figure
+          src={item.src}
+          alt={item.alt}
+          caption={item.caption}
+          width={item.width}
+          height={item.height}
+        />
+      ))}
+    </div>
+  ) : null
+}
+
+<style>
+  .gallery {
+    /* auto-fit + minmax means it naturally drops to fewer columns (down to 1)
+       as the container narrows, while never exceeding --cols on wide screens. */
+    display: grid;
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(14rem, 100%), 1fr)
+    );
+    gap: var(--space-4);
+    margin: var(--space-6) 0;
+  }
+
+  /* The figures inside a gallery shed their own outer margin — the grid gap
+     owns the spacing now. */
+  .gallery :global(.figure) {
+    margin: 0;
+  }
+
+  /* On comfortably wide viewports, honour the author's requested column count. */
+  @media (min-width: 48rem) {
+    .gallery {
+      grid-template-columns: repeat(var(--cols), 1fr);
+    }
+  }
+</style>

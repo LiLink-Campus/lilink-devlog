@@ -13,6 +13,11 @@
   --color-text-muted: #9c8c80;
   --color-text-on-brand: #fff7ee;
 
+  /* RGB channels of --color-text / --color-canvas, for translucent scrims and
+     glass overlays (media facades, the search backdrop). Keep in sync above. */
+  --color-text-rgb: 26, 18, 16;
+  --color-canvas-rgb: 253, 248, 240;
+
   --color-border: rgba(44, 24, 16, 0.1);
   --color-border-strong: rgba(44, 24, 16, 0.18);
   --color-focus: rgba(139, 58, 74, 0.55);

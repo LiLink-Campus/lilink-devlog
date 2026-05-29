@@ -1,0 +1,37 @@
+{
+  "product": {
+    "id": "product",
+    "name": "产品",
+    "description": "功能取舍、流程打磨与用户体验的迭代。"
+  },
+  "engineering": {
+    "id": "engineering",
+    "name": "工程",
+    "description": "架构、性能、可靠性与那些看不见的底层改动。"
+  },
+  "design": {
+    "id": "design",
+    "name": "设计",
+    "description": "界面、交互与视觉语言的演进。"
+  },
+  "privacy": {
+    "id": "privacy",
+    "name": "隐私安全",
+    "description": "账号、数据与隐私保护方面的加固。"
+  },
+  "community": {
+    "id": "community",
+    "name": "社区",
+    "description": "校园社区的运营、氛围与人与人的连接。"
+  },
+  "growth": {
+    "id": "growth",
+    "name": "增长",
+    "description": "拉新、留存与让更多投缘的人加入。"
+  },
+  "milestone": {
+    "id": "milestone",
+    "name": "里程碑",
+    "description": "值得记一笔的重要节点。"
+  }
+}

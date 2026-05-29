@@ -1,0 +1,140 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { tagHref } from "../../lib/tags";
+import { getAllTagsWithCounts } from "../../lib/posts";
+
+const tags = await getAllTagsWithCounts();
+
+const description = "按主题浏览 LiLink 开发日志：产品、工程、设计、隐私安全等标签下的全部更新。";
+---
+
+<BaseLayout title="标签" description={description}>
+  <div class="tags-page container">
+    <header class="page-head">
+      <a class="back" href="/">← 全部更新</a>
+      <h1>标签</h1>
+      <p class="lede">从某个主题切入，回看那一条条相关的迭代。</p>
+    </header>
+
+    {
+      tags.length === 0 ? (
+        <p class="empty">还没有带标签的更新。</p>
+      ) : (
+        <ul class="tag-list">
+          {tags.map(({ tag, count }) => (
+            <li>
+              <a class="tag-row" href={tagHref(tag.id)}>
+                <span class="row-main">
+                  <span class="name">{tag.name}</span>
+                  {tag.description ? (
+                    <span class="desc">{tag.description}</span>
+                  ) : null}
+                </span>
+                <span class="count">
+                  {count}
+                  <span class="unit"> 篇</span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .tags-page {
+    width: min(100% - 2.4rem, var(--measure));
+    padding-block: var(--space-6) var(--space-8);
+  }
+
+  .back {
+    display: inline-block;
+    margin-bottom: var(--space-5);
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    transition: color 0.15s ease;
+  }
+
+  .back:hover {
+    color: var(--color-brand);
+  }
+
+  .page-head h1 {
+    margin: 0 0 var(--space-3);
+    font-size: clamp(1.75rem, 3.5vw, 2.25rem);
+    text-wrap: balance;
+  }
+
+  .page-head .lede {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    text-wrap: pretty;
+  }
+
+  .empty {
+    margin-top: var(--space-6);
+    color: var(--color-text-muted);
+  }
+
+  .tag-list {
+    margin: var(--space-6) 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .tag-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+    transition: background 0.15s ease;
+  }
+
+  .tag-row:hover {
+    background: var(--color-surface-tinted);
+  }
+
+  .row-main {
+    min-width: 0;
+  }
+
+  .name {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    color: var(--color-text);
+    transition: color 0.15s ease;
+  }
+
+  .tag-row:hover .name {
+    color: var(--color-brand);
+  }
+
+  .desc {
+    display: block;
+    margin-top: var(--space-1);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--color-text-muted);
+    text-wrap: pretty;
+  }
+
+  .count {
+    flex-shrink: 0;
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .count .unit {
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+  }
+</style>

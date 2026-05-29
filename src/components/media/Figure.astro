@@ -1,0 +1,51 @@
+---
+// A single captioned image for use inside MDX article bodies.
+// `alt` is REQUIRED by the Props type so authors can't ship inaccessible media.
+// `src` is a plain string (a path under /public or an absolute URL); local
+// imported ImageMetadata covers go through the layout's <Image>, not here.
+interface Props {
+  src: string;
+  alt: string;
+  caption?: string;
+  width?: number;
+  height?: number;
+}
+
+const { src, alt, caption, width, height } = Astro.props;
+---
+
+<figure class="figure">
+  <img
+    src={src}
+    alt={alt}
+    width={width}
+    height={height}
+    loading="lazy"
+    decoding="async"
+  />
+  {caption ? <figcaption>{caption}</figcaption> : null}
+</figure>
+
+<style>
+  .figure {
+    margin: var(--space-6) 0;
+  }
+
+  .figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .figure figcaption {
+    margin-top: var(--space-2);
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+    text-align: center;
+    text-wrap: pretty;
+  }
+</style>

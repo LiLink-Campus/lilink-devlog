@@ -1,0 +1,18 @@
+{
+  "lilink-team": {
+    "id": "lilink-team",
+    "name": "LiLink 团队",
+    "role": "产品 · 工程 · 设计",
+    "bio": "我们在认真地把 LiLink 一周一周打磨好——这里记录每一次迭代背后的取舍。",
+    "links": [{ "label": "主站", "href": "https://www.lilink.top" }],
+    "avatar": null
+  },
+  "nanzhi": {
+    "id": "nanzhi",
+    "name": "Nanzhi",
+    "role": "工程 · 全栈",
+    "bio": "LiLink 的工程负责人，偏后端与平台稳定性，也会写点前端。",
+    "links": [{ "label": "主站", "href": "https://www.lilink.top" }],
+    "avatar": null
+  }
+}

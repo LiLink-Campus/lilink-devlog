@@ -1,0 +1,246 @@
+---
+// Privacy-first video embed.
+//   · `src`       → a local/self-hosted file: <video controls preload="none">.
+//   · `youtube`   → a video id (or full URL); shown as a click-to-load facade.
+//   · `bilibili`  → a BV id (or full URL); shown as a click-to-load facade.
+// For the facades NO third-party request fires until the user clicks: we only
+// render a poster + play button, and an inline script swaps in the iframe on
+// click. `title` is REQUIRED (used as the iframe's accessible name + caption).
+interface Props {
+  title: string;
+  src?: string;
+  youtube?: string;
+  bilibili?: string;
+  poster?: string;
+}
+
+const { title, src, youtube, bilibili, poster } = Astro.props;
+
+// Accept either a bare id or a pasted URL, and pull the id out.
+function youtubeId(input: string): string {
+  const m = input.match(
+    /(?:youtu\.be\/|v=|\/embed\/|\/shorts\/)([\w-]{11})/,
+  );
+  return m ? m[1] : input.trim();
+}
+
+function bilibiliBvid(input: string): string {
+  const m = input.match(/(BV[\w]+)/i);
+  return m ? m[1] : input.trim();
+}
+
+// The iframe URL is computed at build time but only USED (set on the iframe)
+// after a click — see the inline script. Privacy-respecting hosts:
+//   YouTube  → youtube-nocookie.com   Bilibili → player.bilibili.com
+let embedSrc: string | null = null;
+let provider: string | null = null;
+if (!src && youtube) {
+  embedSrc = `https://www.youtube-nocookie.com/embed/${youtubeId(youtube)}?autoplay=1`;
+  provider = "YouTube";
+} else if (!src && bilibili) {
+  embedSrc = `https://player.bilibili.com/player.html?bvid=${bilibiliBvid(bilibili)}&autoplay=1&high_quality=1`;
+  provider = "Bilibili";
+}
+
+const isFacade = !src && embedSrc !== null;
+---
+
+{
+  src ? (
+    <figure class="video">
+      <video controls preload="none" poster={poster} class="player">
+        <source src={src} />
+        你的浏览器不支持内嵌视频，<a href={src}>点此下载播放</a>。
+      </video>
+      <figcaption>{title}</figcaption>
+    </figure>
+  ) : isFacade ? (
+    <figure class="video">
+      <button
+        type="button"
+        class="facade"
+        data-embed={embedSrc}
+        data-title={title}
+        aria-label={`播放视频：${title}`}
+        style={poster ? `--poster:url("${poster}")` : undefined}
+      >
+        <span class="play" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" focusable="false">
+            <path d="M8 5v14l11-7z" fill="currentColor" />
+          </svg>
+        </span>
+        <span class="facade-meta">
+          <span class="facade-title">{title}</span>
+          {provider ? (
+            <span class="facade-host">点击加载 · {provider}</span>
+          ) : null}
+        </span>
+      </button>
+      <figcaption>{title}</figcaption>
+    </figure>
+  ) : null
+}
+
+<script>
+  // Click-to-load: swap the facade button for the real iframe ON CLICK only,
+  // so no request reaches YouTube/Bilibili until the visitor opts in.
+  // Scoped to this component's markup; runs once, idempotently.
+  function mountVideoFacades() {
+    const buttons =
+      document.querySelectorAll<HTMLButtonElement>("button.facade[data-embed]");
+    buttons.forEach((btn) => {
+      if (btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => {
+        const embed = btn.dataset.embed;
+        if (!embed) return;
+        const iframe = document.createElement("iframe");
+        iframe.src = embed;
+        iframe.title = btn.dataset.title ?? "视频";
+        iframe.loading = "lazy";
+        iframe.referrerPolicy = "strict-origin-when-cross-origin";
+        iframe.allow =
+          "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen";
+        iframe.setAttribute("allowfullscreen", "");
+        iframe.className = "player";
+        btn.replaceWith(iframe);
+      });
+    });
+  }
+
+  mountVideoFacades();
+  // Re-run after Astro client-side view transitions, if ever enabled.
+  document.addEventListener("astro:page-load", mountVideoFacades);
+</script>
+
+<style>
+  .video {
+    margin: var(--space-6) 0;
+  }
+
+  /* Shared 16:9 frame for the <video>, the facade button and the swapped-in
+     iframe — so there's no layout shift when the iframe replaces the button. */
+  .video .player,
+  .video .facade {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .video .player {
+    background: var(--color-text);
+  }
+
+  /* iframe injected by the script inherits .player but needs border:0 reset. */
+  .video :global(iframe.player) {
+    border: 1px solid var(--color-border);
+  }
+
+  .video .facade {
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    padding: 0;
+    color: var(--color-text-on-brand);
+    background:
+      var(--poster, none) center / cover no-repeat,
+      linear-gradient(135deg, var(--color-brand-ink), var(--color-brand));
+    transition:
+      box-shadow 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  /* Scrim so the title/host stay legible over any poster. */
+  .video .facade::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to top,
+      rgba(var(--color-text-rgb), 0.55),
+      rgba(var(--color-text-rgb), 0.05) 55%,
+      transparent
+    );
+  }
+
+  .video .facade:hover {
+    box-shadow: var(--shadow-md);
+  }
+
+  .video .facade:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: grid;
+    place-items: center;
+    width: 4rem;
+    height: 4rem;
+    border-radius: var(--radius-pill);
+    background: rgba(var(--color-canvas-rgb), 0.16);
+    backdrop-filter: blur(2px);
+    border: 1px solid rgba(var(--color-canvas-rgb), 0.5);
+    transition:
+      background 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  .play svg {
+    margin-left: 3px; /* optically centre the triangle */
+  }
+
+  .video .facade:hover .play {
+    background: var(--color-brand);
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+
+  .facade-meta {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+  }
+
+  .facade-title {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    line-height: 1.4;
+    text-wrap: pretty;
+  }
+
+  .facade-host {
+    font-size: 0.74rem;
+    letter-spacing: 0.02em;
+    opacity: 0.85;
+  }
+
+  .video figcaption {
+    margin-top: var(--space-2);
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--color-text-muted);
+    text-align: center;
+    text-wrap: pretty;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .video .facade,
+    .play,
+    .video .facade:hover .play {
+      transition: none;
+    }
+  }
+</style>
