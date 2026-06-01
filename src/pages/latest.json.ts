@@ -1,18 +1,9 @@
 import type { APIRoute } from "astro";
-import {
-  UPDATES_JSON_HEADERS,
-  getLatestPublishedAt,
-} from "../lib/updates-feed";
+import { UPDATES_JSON_HEADERS, buildLatestProbe } from "../lib/updates-feed";
 
-/** Lightweight probe for the LiLink nav NEW badge (latest publish date only). */
+/** Lightweight probe for the LiLink nav NEW badge: latest publish date + post count. */
 export const GET: APIRoute = async () => {
-  const latestPublishedAt = await getLatestPublishedAt();
+  const probe = await buildLatestProbe();
 
-  return new Response(
-    JSON.stringify({
-      generatedAt: new Date().toISOString(),
-      latestPublishedAt,
-    }),
-    { headers: UPDATES_JSON_HEADERS },
-  );
+  return new Response(JSON.stringify(probe), { headers: UPDATES_JSON_HEADERS });
 };
