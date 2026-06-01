@@ -2,10 +2,11 @@ import rss from "@astrojs/rss";
 import type { APIContext } from "astro";
 import { getPublishedPosts, postPath } from "../lib/posts";
 import { resolveTags } from "../lib/tags";
+import { DEFAULT_SITE_URL } from "../lib/site";
 
 export async function GET(context: APIContext) {
   const posts = await getPublishedPosts();
-  const site = context.site ?? new URL("https://devlog.lilink.top");
+  const site = context.site ?? new URL(DEFAULT_SITE_URL);
 
   return rss({
     title: "LiLink devlog",
