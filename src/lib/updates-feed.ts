@@ -55,6 +55,11 @@ export async function getLatestPublishedAt(): Promise<string | null> {
   return posts[0] ? toIsoDate(posts[0].data.publishedAt) : null;
 }
 
+// 本站为 Astro static 输出：这些 endpoint 在构建时被预渲染为静态 .json 文件，
+// 因此 Response 上的 HTTP header 不会生效。对外真正的 CORS / Cache-Control 由
+// vercel.json 的 `headers` 按 /updates.json、/latest.json 路径下发；content-type
+// 由 Vercel 依扩展名自动设置。此常量保留作意图声明，并在某端点将来改为 SSR
+// （export const prerender = false）时兜底。
 export const UPDATES_JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "access-control-allow-origin": "*",
