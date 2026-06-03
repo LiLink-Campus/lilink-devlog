@@ -66,11 +66,47 @@ tags: ["product", "engineering", "design", "privacy"]
 - 渐进引入兴趣标签
 - 引入互评系统在1v1和多人局，收集更多数据尝试 reciporal collaborative filtering
 
-#### 添加storybook，以在上线时检测各种viewport的responsiveness
-
 #### first-party analytics，可观测性基建与生产部署流程优化
 
-#### pin node/npm version和分离tsconfig
+##### analytics 要回答怎样的问题, 要如何设计确保可维护性又不过度工程化?
+
+有人反馈说不知道优惠券在哪里; 有人反馈说对象匹配不到; 有人不知道可以添加微信号; 有人不知道怎么举报. 
+
+我们需要衡量各个功能组件的实际用户触达足迹, 以支持产品决策: 未来要不要做onboarding guide? 要不要把某个重要功能放到其他位置? 有没有什么设计实际是冗余的, 用户永远不会交互?
+
+参考成熟RUM/product analysis, 我选择「足迹 -> 意图 -> 结果」的分层. 并确保前后端, 数据库边界权责清晰.
+
+在让AI完成的过程中, 它犯了错. 比如 `page_viewed` 和 `component_viewed` 用同一套判断. 这在代码上很诱人, 类似 IntersectionObserver 抽成一个hook就结束了. 但语义上不对.
+
+*Analytics 必须要语义精确!*
+
+如果把page root也要求成 50% visible + 900ms, 在移动端、长页面、layout shift、快速跳转时都会系统性漏记. 反过来, `component/surface viewed` 的含义是「用户真的有机会看到这个具体控件或信息」, mount不算, 被折叠在首屏下也不算.
+
+analytics很容易滑向「先多收点以后再说」. 但LiLink的数据里有联系方式、学校、匹配关系, 所以我给AI的限制是：metadata只能按白名单进. first-party analytics不是 tracking, 我们只收产品判断真正需要的结构化事实.
+
+outcome事件还有一个容易被AI写错的点：它会倾向在业务service里直接插一条ProductEvent. 这在demo里能跑, 但不是我想要的生产语义.
+
+业务事实和analytics记录必须解耦. 用户申请联系方式、商家核销优惠券、双方最终确认约见, 这些主流程不能因为analytics写入失败而失败. 但反过来, 这些outcome又不能随便丢, 因为它们是漏斗最后一步. 所以业务事务里只写outbox, 后台再flush到ProductEvent; 失败可以重试, 重复可以靠确定性的event id去重, 每天再从真实业务表reconcile最近一段时间的outcome.
+
+analytics一旦参与产品决策, 它就不能只是best-effort log, 但它也不能反过来成为业务系统的blocking单点故障, outbox正好卡在这两个约束之间.
+
+##### 接入sentry, 在生产出事时及时知道
+
+前后端都接入, 添加必要的breadcrumb, beforeSend脱敏, production按分类采样率收trace/replay, source map部署自动上传. 
+
+这里AI容易忽略的是secret边界. `SENTRY_AUTH_TOKEN` 不能作为普通build arg或runtime env进Docker, 泄漏风险. 最后采用的是BuildKit secret只在build时可见, build完上传source map. 其实也可以在build过程中inject, 分离部署和sourcemap上传, 更优雅但需要单独保证部署和sourcemap版本一致, 目前无需求.
+
+##### 生产部署流程优化
+
+思路和 analytics 类似：不要把关键语义藏在隐式环境里。之前 prod 实际上依赖一个长期被 neglect 的 worktree / Dockerfile 来 run API，连的是生产 Neon DB；这意味着生产环境和开发分支不是同一条受控路径，而是在持续 drift。这次我们把相关入口和路径配置化，明确拆开 local / prod 的 Dockerfile、compose 和 env secret 边界，让开发、CI、preview、production 各自的假设写在配置里，而不是靠人记。
+
+local compose只做本地Postgres/Mailpit/可选API, prod compose只做生产API. 生产env通过Docker secret进entrypoint, 而不是暴露在compose environment里. 这样 `docker inspect` 和 `docker exec env` 不会直接显示DATABASE_URL/JWT/SMTP这类secret. 发布命令也收敛到root scripts, 由脚本固定prod compose、BuildKit、release解析, 减少「我以为我跑的是生产配置」这种人为错误.
+
+最后pin node/npm 解决了工具链一致性问题(如果不pin可能出现package-lock在不同环境不同), web production typecheck和storybook/test tsconfig分开. 
+
+越是小团队, 越不能把生产安全寄托在「这次应该不会忘」上.
+
+#### 添加storybook，以在上线时检测各种viewport的responsiveness
 
 ---
 
