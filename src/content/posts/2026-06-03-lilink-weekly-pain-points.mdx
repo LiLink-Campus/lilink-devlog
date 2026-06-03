@@ -108,6 +108,24 @@ local compose只做本地Postgres/Mailpit/可选API, prod compose只做生产API
 
 #### 添加storybook，以在上线时检测各种viewport的responsiveness
 
+responsive 问题需要两条路径：一条方便人看，一条方便 AI 和自动化看。
+
+给人看的路径是 matrix。matrix 要把高风险状态和关键 viewport 摊在同一张画布里：一边是不同页面状态，一边是 360、390、430、768、1280 这类代表性宽度。
+
+<Figure
+  src="/media/2026-06-03/storybook-responsive-matrix.png"
+  alt="Storybook 中用于检查匹配页不同状态和 viewport 的 responsive matrix"
+  caption="Storybook responsive matrix：把高风险页面状态和代表性 viewport 放在同一张画布里，方便上线前快速扫出文字溢出、按钮挤压和移动端层级问题。"
+  width={2052}
+  height={1304}
+/>
+
+这条路径服务人的视觉判断. 很多 responsive bug 不是测试能轻易断言的布尔值，而是「看起来已经不像一个可用产品」：易读性，CTA 显眼性，中文、英文和数字混排后节奏变差。matrix 的意义就是把这些问题集中暴露出来。
+
+给 AI 看的路径则相反：把页面拆成小组件、稳定 fixture 和 Playwright 可以操作的 case。AI 更擅长处理明确边界：这个按钮在 loading/disabled/normal 下是否还能渲染；这个卡片在长文案下是否报错；这个交互点击后是否出现预期文案。小组件 story 和 fixture 给 AI 提供抓手，Playwright 再把这些抓手变成可重复运行的 smoke check。
+
+fixture 一定要写成 adversarial data。真正会打爆 responsive 的通常是状态空间内的最差组合. Responsiveness 是 viewport、内容长度、字体宽度、页面状态和交互密度共同形成的覆盖问题
+
 ---
 
 ## 正在优化中
