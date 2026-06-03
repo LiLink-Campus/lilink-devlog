@@ -1,0 +1,67 @@
+---
+import { getAuthor, type Author } from "../lib/authors";
+
+interface Props {
+  id?: string;
+  ids?: string[];
+  label?: string;
+}
+
+const { id, ids, label } = Astro.props;
+const requestedIds = ids ?? (id ? [id] : []);
+const mentions = requestedIds.map((authorId) => ({
+  id: authorId,
+  author: getAuthor(authorId),
+}));
+
+function primaryHref(author: Author): string | undefined {
+  return author.links?.[0]?.href;
+}
+---
+
+{
+  mentions.length > 0 ? (
+    <span class="author-mention">
+      {mentions.map(({ id: authorId, author }, i) => {
+        const href = author ? primaryHref(author) : undefined;
+        const text = label && mentions.length === 1 ? label : (author?.name ?? authorId);
+        const title = author?.role ?? author?.name ?? `未知作者 id: ${authorId}`;
+        return (
+          <>
+            {i > 0 ? <span class="sep" aria-hidden="true">、</span> : null}
+            {href ? (
+              <a
+                class="name"
+                href={href}
+                rel="noopener noreferrer"
+                target={href.startsWith("http") ? "_blank" : undefined}
+                title={title}
+              >
+                {text}
+              </a>
+            ) : (
+              <span class:list={["name", !author && "missing"]} title={title}>
+                {text}
+              </span>
+            )}
+          </>
+        );
+      })}
+    </span>
+  ) : null
+}
+
+<style>
+  .author-mention {
+    display: inline;
+  }
+
+  .sep {
+    color: var(--color-border-strong);
+    margin-inline: 0.1em;
+  }
+
+  .missing {
+    color: var(--color-text-muted);
+  }
+</style>
