@@ -1,0 +1,40 @@
+---
+title: "lilink这一周做了什么? 解决了哪些痛点"
+publishedAt: 2026-06-03
+summary: "这周我们优化了首页待办、匹配体验、iOS 响应式问题，并补上分析、可观测性和发布流程等工程基础。"
+status: draft
+authors: ["lilink-team"]
+tags: ["product", "engineering", "design", "privacy"]
+---
+
+## lilink这一周做了什么? 解决了哪些痛点
+
+#### UX优化: 首页待办清单-自动跳转
+
+#### 追踪用户活跃数据, 并应用到匹配算法: 未来匹配到用户但是对方不回应的情况会越来越少
+
+#### 修复responsive UI在ios上的问题
+
+---
+
+### 更多技术细节 by <AuthorMention id="s3d-i" />:
+
+#### 匹配数据与算法分析: 为什么我匹配不到人?
+
+#### 添加storybook, 以在上线时检测各种viewport的responsiveness
+
+#### first-party analytics, 可观测性基建与生产部署流程优化
+
+#### pin node/npm version和分离tsconfig
+
+---
+
+## 正在优化中
+### 多人局匹配
+
+### 匹配后互评反馈
+假设: 相似的人更可能喜欢同一个人
+### 非侵入式的兴趣标签系统
+我们会避免把兴趣标签系统做得overwhelming
+### 敏感数据访问权限系统
+微信, 手机号, 姓名等都属于敏感信息, 当能接触到生产环境可能超过2人, 受限访问的设计和审批流程变的必须
