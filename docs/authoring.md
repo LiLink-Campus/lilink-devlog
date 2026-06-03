@@ -230,6 +230,20 @@ npm run validate:build  # 加 --check-build，校验 dist/ 产物（一般交给
 
 > 校验脚本会确保每个 `<Figure>` / `<img>` 与 `<Gallery>` 的每个 item 有非空 `alt`、每个 `<Video>` 有非空 `title`，引用的本地媒体确实存在，且组件 `src` 用的是 `public/` 根路径（不是 `./assets/` 相对路径）。
 
+### 8.4 作者组件
+
+正文里可以直接插入作者信息，数据来自 `src/content/authors.json`，无需在文章里重复写 GitHub 链接：
+
+```mdx
+### 更多技术细节 by <AuthorMention id="s3d-i" />:
+
+<AuthorCard ids={["nanzhi", "s3d-i"]} />
+```
+
+- `<AuthorMention>` 适合放在标题或句子里，默认显示作者名，并链接到作者注册表里的第一条链接。
+- `<AuthorCard>` 适合在正文中插入完整作者卡片，样式复用文章末尾的作者卡。
+- `id` / `ids` 都必须是 `src/content/authors.json` 里已经注册过的作者 id。
+
 ---
 
 ## 9. 标签页与搜索是怎么工作的

@@ -13,5 +13,13 @@
 import Figure from "./media/Figure.astro";
 import Gallery from "./media/Gallery.astro";
 import Video from "./media/Video.astro";
+import AuthorBlock from "./AuthorBlock.astro";
+import AuthorMention from "./AuthorMention.astro";
 
-export const mdxComponents = { Figure, Gallery, Video };
+export const mdxComponents = {
+  Figure,
+  Gallery,
+  Video,
+  AuthorMention,
+  AuthorCard: AuthorBlock,
+};

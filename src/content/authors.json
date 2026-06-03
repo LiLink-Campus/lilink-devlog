@@ -14,5 +14,11 @@
     "bio": "LiLink 的工程负责人，偏后端与平台稳定性，也会写点前端。",
     "links": [{ "label": "主站", "href": "https://www.lilink.top" }],
     "avatar": null
+  },
+  "s3d-i": {
+    "id": "s3d-i",
+    "name": "s3d-i",
+    "links": [{ "label": "GitHub", "href": "https://github.com/s3d-i" }],
+    "avatar": null
   }
 }
